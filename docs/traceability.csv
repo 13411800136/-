@@ -1,0 +1,28 @@
+requirement,m_status,implementation,api,tables,tests,result,notes
+R01 身份与会话,已验收,modules/auth/routes.ts; common/auth.ts; common/crypto.ts,POST /auth/login; GET /auth/me; POST /auth/logout,users;sessions;audit_logs,tests/integration/auth.test.ts;master-session.test.ts;tests/e2e/full-flow.spec.ts,33/33 + 2/2 通过,真实会话与角色；停用撤销旧会话
+R02 基础数据,已验收,modules/master/routes.ts,GET/POST/PATCH /customers /suppliers /parts /departments /users,users;departments;customers;suppliers;parts,tests/integration/master-session.test.ts,通过,编码唯一；停用不删历史
+R03 业务订单,已验收,modules/orders/routes.ts; orders/service.ts,GET/POST /orders; GET /orders/:id,orders;order_items;order_timeline;audit_logs,tests/integration/order-flow.test.ts;tests/e2e/full-flow.spec.ts,通过,单产品；唯一订单号；无编辑取消
+R04 采购,已验收,modules/purchases/routes.ts,POST /orders/:id/purchase-orders,purchase_orders;purchase_items,tests/integration/order-flow.test.ts,通过,一单一采购单；价格快照
+R05 到货,已验收,modules/purchases/routes.ts,POST /purchase-items/:id/arrivals,arrival_records;order_timeline;notifications,tests/integration/order-flow.test.ts,通过,累计≤采购量；幂等
+R06 电镀,不适用,orders/service.ts 阶段投影,无,无,tests/integration/order-flow.test.ts,PLATING:NOT_APPLICABLE,范围表 M 不启用
+R07 生产,已验收,modules/production/routes.ts,POST /orders/:id/production-orders; POST /production-orders/:id/feedbacks,production_orders;production_feedbacks,tests/integration/order-flow.test.ts,通过,单部门/单任务；数量受限
+R08 单价开关,已验收,modules/production/routes.ts,PATCH /production-orders/:id/price-visibility,production_orders,tests/integration/order-flow.test.ts,通过,现场按开关裁剪
+R09 质检,已验收,modules/qc/routes.ts,POST /orders/:id/dispatch-qc; POST /production-orders/:id/qc-records; POST /qc-records/:id/decision,qc_records;production_orders,tests/integration/order-flow.test.ts,通过,一次全检全合格；录入/放行分离
+R10 包装,已验收,modules/packing/routes.ts,POST /orders/:id/dispatch-packing; POST /orders/:id/packing-records,packing_records,tests/integration/order-flow.test.ts,通过,≤放行/应交
+R11 发货,已验收,modules/shipping/routes.ts,POST /orders/:id/trigger-shipment; POST /orders/:id/shipments,shipment_records;orders,tests/integration/order-flow.test.ts,通过,≤可发/应交；足量完成
+R12 撤销修正,已实现（M 边界）,modules/cancellations/routes.ts,POST /{resource}/:id/cancel; DELETE /{resource}/:id,无,auth.test.ts,409 FEATURE_NOT_ENABLED,不删除记录；F 撤销未选做
+R13 配件库存,已验收,modules/inventory/routes.ts,POST /inventory/parts/adjust; GET /inventory/parts/:id/logs,part_inventory;inventory_logs,tests/integration/inventory.test.ts,通过,非负；幂等；条件更新
+R14 成品库存,已验收,modules/inventory/routes.ts,POST /inventory/products/adjust; GET /inventory/products/:id/logs,product_inventory;inventory_logs,tests/integration/inventory.test.ts,通过,唯一身份；首建并发
+R15 利润,已验收,common/money.ts; orders/service.ts,GET /orders/:id/profit; GET /orders/:id,orders;order_items;purchase_items;production_feedbacks,tests/unit/money.test.ts;order-flow.test.ts,878.00 / 70.24%,整数分；预计利润
+R16 时间线与状态,已验收,common/events.ts; orders/service.ts,GET /orders/:id/timeline; GET /orders/:id/operation-summary,order_timeline;orders,tests/integration/order-flow.test.ts;tests/e2e/full-flow.spec.ts,13 事件/9 阶段,直接 PATCH 409
+R17 附件,已验收,modules/attachments/routes.ts,POST /orders/:id/attachments; GET /attachments/:id/download,attachments,tests/integration/export-attachment.test.ts,通过,PDF≤5MB；魔数；鉴权
+R18 导入,不适用,无（基础数据页面维护）,无,无,--,不适用,范围表 M 允许不提供
+R19 导出,已验收,modules/exports/routes.ts,GET /exports/orders.xlsx,orders;order_items;audit_logs,tests/integration/export-attachment.test.ts,通过,xlsx 真实文件；空表头；鉴权
+R20 通知,已验收,common/events.ts; modules/notifications/routes.ts,GET /notifications; POST /notifications/:id/read; POST /notifications/mark-all-read,notifications,tests/integration/order-flow.test.ts;notifications-dashboard.test.ts,通过,关键事件；未读一致；全部已读 F 切片
+R21 看板,已验收,modules/dashboard/routes.ts,GET /dashboard/summary,dashboard 查询业务表,tests/integration/notifications-dashboard.test.ts;截图,通过,状态/生产/利润/临期/库存
+R22 异常上报,已验收,modules/exceptions/routes.ts,POST /tablet/exceptions; GET /exceptions,tablet_exceptions;order_timeline;notifications,tests/integration/notifications-dashboard.test.ts,通过,跨部门 404；不改数量
+R23 审计,已验收,common/audit.ts; modules/audit/routes.ts,GET /audit-logs,audit_logs,tests/integration/order-flow.test.ts;notifications-dashboard.test.ts,通过,脱敏；只读；管理员检索 F 切片
+R24 重试与弱网,已验收,frontend/lib/api.ts; hooks.ts; 各表单,写接口幂等键,idempotency_requests,tests/e2e/network-retry.spec.ts,通过,未知结果/草稿/同键重试
+R25 可靠性,已验收,db/database.ts; common/idempotency.ts; services,--,全部业务表,tests/integration/inventory.test.ts;atomicity.test.ts,通过,事务/约束/并发/回滚
+R26 环境交付,已验收,config.ts; migrate.ts; seed.ts; scripts/backup|restore,GET /health; GET /ready,--,tests/reports/clean-room-*;backup-run.txt;restore-run.txt,通过,干净安装+恢复新实例
+R27 AI 与文档,已验收,PRD/README/AGENTS/CONSTRAINTS/docs/tasks/tests,--,--,本报告/追溯/功能状态,通过,与当前版本一致
