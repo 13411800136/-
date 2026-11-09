@@ -6,6 +6,7 @@ import { ok } from '../../common/http.js';
 import { nowIso } from '../../common/time.js';
 import { idParam, validate } from '../../common/validation.js';
 import type { AppContext } from '../../common/types.js';
+import { generateDueSoonNotifications } from './reminders.js';
 
 export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppContext): Promise<void> {
   const { db, config } = ctx;
@@ -21,6 +22,7 @@ export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppC
       request.query
     );
     const actor = request.auth!.user;
+    generateDueSoonNotifications(db);
     const rows = db.all<{
       id: string;
       event_type: string;
@@ -58,6 +60,7 @@ export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppC
   });
 
   app.get('/notifications/unread-count', admin, async (request, reply) => {
+    generateDueSoonNotifications(db);
     const row = db.get<{ count: number }>(
       'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL',
       request.auth!.user.id

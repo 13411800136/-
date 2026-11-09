@@ -1,6 +1,6 @@
 # 架构说明：厂序 FactoryFlow
 
-版本/基线：v1.2.0 / 2026-11-09
+版本/基线：v1.3.0 / 2026-11-09
 关联：[PRD](../PRD-factory.md) · [接口合同](api-contract.md) · [数据字典](data-dictionary.md) · [状态与数量](state-and-quantity.md)
 
 ## 1. 系统上下文

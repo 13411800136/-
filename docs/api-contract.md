@@ -1,6 +1,6 @@
 # API 合同：厂序 FactoryFlow
 
-版本：v1.2.0（2026-11-09）
+版本：v1.3.0（2026-11-09）
 前缀：`/api/v1`；Content-Type：`application/json`（附件上传为 multipart，导出为 xlsx）。
 成功：`{ "data": ..., "requestId": "..." }`；失败：`{ "error": { "code": "...", "message": "...", "details": ... }, "requestId": "..." }`。
 
@@ -123,7 +123,8 @@
 
 | 方法/路径 | 角色 | 说明 |
 | --- | --- | --- |
-| `POST /orders/:id/attachments` | ADMIN | multipart `file`；PDF ≤20MB；魔数校验 |
+| `POST /orders/:id/attachments` | ADMIN | multipart `file`；PDF/PNG/JPG ≤20MB；扩展名/MIME/魔数一致 |
+| `GET /exports/inventory.xlsx` | ADMIN | 配件/成品两个工作表的库存台账 |
 | `POST /departments` | ADMIN | 新增部门；名称、类别（PRODUCTION/LOGISTICS/QC/PACKING） |
 | `PATCH /customers/:id` | ADMIN | 客户名称/联系方式/税号/地址；税号地址选填 |
 | `GET /orders/:id/attachments` | ADMIN | 附件列表 |
@@ -228,6 +229,7 @@
 - 拒绝：接收人停用/不存在 400；给自己发 400；关联订单不在职责范围 404；重复键异体 409。
 - 读取：`GET /messages/inbox`（返回未读数）、`GET /messages/sent`、`POST /messages/:id/read`（仅接收人）。
 - 表：`internal_messages`、`audit_logs`、`idempotency_requests`；消息只追加，不提供删除。
+- 交期提醒（F）：读取 `GET /notifications` 或 `GET /notifications/unread-count` 时补齐；7 天内/逾期、未完成/未撤销订单，每订单每天一条。
 
 ### 3.6 订单扩展操作（v1.2）
 

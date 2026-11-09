@@ -1,6 +1,6 @@
 # 权限与字段可见性
 
-版本：v1.2.0 / 2026-11-09
+版本：v1.3.0 / 2026-11-09
 
 权限由**后端**执行：路由角色守卫 + 服务层对象/部门校验 + 输出字段裁剪 + 文件鉴权。前端 `ProtectedRoute` 与隐藏按钮只是交互辅助，不能作为授权依据。
 
@@ -46,6 +46,7 @@
 | 内部消息 | 只能读/标记 `recipient_id = 自己` 的消息；发送人只能看自己的已发送；关联订单必须属于职责范围 | `messages/routes.ts` |
 | 订单撤销 | 仅 ADMIN；服务端校验 `cancelled_at IS NULL`、`status=PENDING_PURCHASE`、无采购/生产、创建≤12h；原因必填 | `orders/routes.ts` |
 | 批量确认发货 | 仅 ADMIN；逐单校验 PACKING、包装量≥订单量；任一失败整批不执行 | `orders/routes.ts` |
+| 库存导出 | 仅 ADMIN；xlsx 文件 | `exports/routes.ts` |
 | 附件 | 管理员；订单必须存在；下载按附件 ID + 存储键，不暴露本地路径 | `attachments/routes.ts` |
 | 订单导出 | 管理员；筛选条件由服务端重新执行 | `exports/routes.ts` |
 | 库存 | 管理员；来源订单若提供必须存在 | `inventory/routes.ts` |
@@ -74,7 +75,7 @@
 
 ## 5. 文件权限
 
-- 上传：仅 ADMIN；PDF；MIME=`application/pdf`；扩展名 `.pdf`；文件头 `%PDF-`；≤20MB。
+- 上传：仅 ADMIN；PDF/PNG/JPG；扩展名、MIME、文件头三者一致；≤20MB。
 - 存储：随机 UUID 文件名，目录由配置指定；数据库存原始名与存储键；拒绝路径穿越。
 - 下载：仅 ADMIN；按数据库存储键读取；`Content-Disposition` 使用安全文件名；缺失返回 404。
 - 失败：元数据写入失败删除物理文件；上传失败不影响已有订单；重复上传会生成新元数据（附件不做幂等去重，已知限制）。

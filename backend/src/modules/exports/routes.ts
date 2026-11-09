@@ -137,6 +137,57 @@ export async function registerExportRoutes(app: FastifyInstance, ctx: AppContext
     return reply.send(Buffer.from(buffer));
   });
 
+  app.get('/exports/inventory.xlsx', admin, async (request, reply) => {
+    const parts = db.all<{ name: string; spec: string; unit: string; quantity: number; active: number }>(
+      `SELECT p.name, p.spec, p.unit, COALESCE(i.quantity, 0) AS quantity, p.active
+       FROM parts p LEFT JOIN part_inventory i ON i.part_id = p.id
+       ORDER BY p.active DESC, p.name`
+    );
+    const products = db.all<{ name: string; spec: string; quantity: number }>(
+      `SELECT product_name AS name, spec, quantity FROM product_inventory ORDER BY product_name, spec`
+    );
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = '厂序 FactoryFlow';
+    workbook.created = new Date();
+    const partSheet = workbook.addWorksheet('配件库存', { views: [{ state: 'frozen', ySplit: 1 }] });
+    partSheet.columns = [
+      { header: '配件名称', key: 'name', width: 26 },
+      { header: '规格', key: 'spec', width: 24 },
+      { header: '单位', key: 'unit', width: 10 },
+      { header: '库存数量', key: 'quantity', width: 14 },
+      { header: '状态', key: 'status', width: 10 }
+    ];
+    for (const row of parts) {
+      partSheet.addRow({ name: row.name, spec: row.spec, unit: row.unit, quantity: row.quantity, status: row.active === 1 ? '启用' : '停用' });
+    }
+    const productSheet = workbook.addWorksheet('成品库存', { views: [{ state: 'frozen', ySplit: 1 }] });
+    productSheet.columns = [
+      { header: '成品名称', key: 'name', width: 26 },
+      { header: '规格', key: 'spec', width: 24 },
+      { header: '库存数量', key: 'quantity', width: 14 }
+    ];
+    for (const row of products) {
+      productSheet.addRow({ name: row.name, spec: row.spec, quantity: row.quantity });
+    }
+    const buffer = await workbook.xlsx.writeBuffer();
+    writeAudit(db, {
+      requestId: request.id,
+      actor: request.auth!.user,
+      action: 'EXPORT_INVENTORY_XLSX',
+      resourceType: 'EXPORT',
+      resourceId: 'inventory.xlsx',
+      result: 'SUCCESS',
+      detail: `配件=${parts.length}，成品=${products.length}`
+    });
+    reply.header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    reply.header(
+      'Content-Disposition',
+      `attachment; filename="inventory-${businessDate()}.xlsx"; filename*=UTF-8''${encodeURIComponent(`库存台账-${businessDate()}.xlsx`)}`
+    );
+    reply.header('Cache-Control', 'private, no-store');
+    return reply.send(Buffer.from(buffer));
+  });
+
   app.get('/exports/history', admin, async (request, reply) => {
     const rows = db.all<{
       id: string;

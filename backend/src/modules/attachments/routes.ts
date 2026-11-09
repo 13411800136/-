@@ -11,9 +11,12 @@ import { idParam, validate } from '../../common/validation.js';
 import type { AppContext } from '../../common/types.js';
 import { getOrderOrThrow } from '../orders/service.js';
 
-const ALLOWED_MIME = 'application/pdf';
-const ALLOWED_EXT = '.pdf';
-const MAGIC = Buffer.from('%PDF-', 'ascii');
+const ALLOWED_TYPES: Record<string, { mime: string; magic: Buffer }> = {
+  '.pdf': { mime: 'application/pdf', magic: Buffer.from('%PDF-', 'ascii') },
+  '.png': { mime: 'image/png', magic: Buffer.from('89504e470d0a1a0a', 'hex') },
+  '.jpg': { mime: 'image/jpeg', magic: Buffer.from('ffd8ff', 'hex') },
+  '.jpeg': { mime: 'image/jpeg', magic: Buffer.from('ffd8ff', 'hex') }
+};
 
 function safeOriginalName(name: string): string {
   const base = name.replace(/\\/g, '/').split('/').pop() ?? 'document.pdf';
@@ -35,12 +38,13 @@ export async function registerAttachmentRoutes(app: FastifyInstance, ctx: AppCon
     const actor = request.auth!.user;
     const order = getOrderOrThrow(db, orderId);
     const upload = await request.file();
-    if (!upload) throw errors.validation('请选择要上传的 PDF 文件');
+    if (!upload) throw errors.validation('请选择要上传的 PDF 或图片文件');
     const originalName = safeOriginalName(upload.filename);
     const extension = extname(originalName).toLowerCase();
-    if (extension !== ALLOWED_EXT || upload.mimetype !== ALLOWED_MIME) {
+    const allowed = ALLOWED_TYPES[extension];
+    if (!allowed || upload.mimetype !== allowed.mime) {
       upload.file.resume();
-      throw new AppError('UNSUPPORTED_FILE_TYPE', '只允许上传 PDF 文件（.pdf，application/pdf）');
+      throw new AppError('UNSUPPORTED_FILE_TYPE', '只允许上传 PDF、PNG、JPG/JPEG 文件');
     }
     let buffer: Buffer;
     try {
@@ -55,11 +59,11 @@ export async function registerAttachmentRoutes(app: FastifyInstance, ctx: AppCon
     if (buffer.length > config.maxUploadBytes) {
       throw errors.validation(`文件超过大小上限（${Math.floor(config.maxUploadBytes / 1024 / 1024)} MB）`);
     }
-    if (!buffer.subarray(0, MAGIC.length).equals(MAGIC)) {
-      throw new AppError('UNSUPPORTED_FILE_TYPE', '文件内容不是有效的 PDF（扩展名或 MIME 可能被伪装）');
+    if (!buffer.subarray(0, allowed.magic.length).equals(allowed.magic)) {
+      throw new AppError('UNSUPPORTED_FILE_TYPE', '文件内容与扩展名/MIME 不匹配（可能被伪装）');
     }
 
-    const storedName = `${newId()}${ALLOWED_EXT}`;
+    const storedName = `${newId()}${extension}`;
     const absolutePath = resolve(config.uploadDir, storedName);
     if (!absolutePath.startsWith(resolve(config.uploadDir))) {
       throw errors.validation('存储路径不合法');
@@ -76,7 +80,7 @@ export async function registerAttachmentRoutes(app: FastifyInstance, ctx: AppCon
           orderId,
           originalName,
           storedName,
-          ALLOWED_MIME,
+          allowed.mime,
           buffer.length,
           digest,
           actor.id,
@@ -99,7 +103,7 @@ export async function registerAttachmentRoutes(app: FastifyInstance, ctx: AppCon
           id: attachmentId,
           orderId: order.id,
           originalName,
-          mime: ALLOWED_MIME,
+          mime: allowed.mime,
           size: buffer.length,
           sha256: digest,
           createdAt: nowIso()

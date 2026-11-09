@@ -188,8 +188,17 @@ export function AttachmentPanel({
 
   const upload = async (file: File) => {
     setError(null);
-    if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-      setError('只允许上传 PDF 文件');
+    const name = file.name.toLowerCase();
+    const allowed =
+      file.type === 'application/pdf' ||
+      file.type === 'image/png' ||
+      file.type === 'image/jpeg' ||
+      name.endsWith('.pdf') ||
+      name.endsWith('.png') ||
+      name.endsWith('.jpg') ||
+      name.endsWith('.jpeg');
+    if (!allowed) {
+      setError('只允许上传 PDF、PNG、JPG/JPEG 文件');
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
@@ -229,7 +238,7 @@ export function AttachmentPanel({
     <div className="attachment-panel">
       <SectionTitle
         title="订单附件"
-        hint="仅 PDF · 最大 20 MB"
+        hint="PDF / PNG / JPG · 最大 20 MB"
         action={
           <Button size="sm" variant="secondary" icon={<Upload size={14} />} loading={uploading} onClick={pick}>
             上传
@@ -239,7 +248,7 @@ export function AttachmentPanel({
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,application/pdf"
+        accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
         hidden
         onChange={(event) => {
           const file = event.target.files?.[0];
@@ -250,7 +259,7 @@ export function AttachmentPanel({
       {attachments.length === 0 ? (
         <div className="attachment-empty">
           <Paperclip size={18} />
-          <span>暂无附件。可上传 PDF 图纸或确认单。</span>
+          <span>暂无附件。可上传 PDF 图纸/确认单，或 PNG/JPG 照片。</span>
         </div>
       ) : (
         <ul className="attachment-list">

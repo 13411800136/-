@@ -1,6 +1,6 @@
 # 功能状态表：R01-R27
 
-版本：v1.2.0 / 2026-11-09
+版本：v1.3.0 / 2026-11-09
 状态定义：**已验收**＝当前版本有真实执行证据；**已实现待验收**＝代码完成但未跑对应场景；**部分实现**＝只完成申报切片；**未实现**；**不适用**＝范围表明确允许或明确不启用。未执行不填“通过”。
 
 ## 1. M 必做逐项状态
@@ -23,17 +23,25 @@
 | R14 成品库存 | M | **已验收** | `modules/inventory/routes.ts` | `inventory.test.ts`（唯一身份、首建并发、最终 2） | `productKey` 规范化；首次必须正向 |
 | R15 利润 | M | **已验收** | `common/money.ts`、`orders/service.ts` | `money.test.ts`、`order-flow.test.ts`（878.00 / 70.24%） | 预计利润；无电镀成本；非财务结算 |
 | R16 时间线与状态 | M | **已验收** | `common/events.ts`、`orders/service.ts` | `order-flow.test.ts`（13 事件、9 阶段）、E2E 截图 | 直接 PATCH 状态 409；电镀 N/A |
-| R17 附件 | M | **已验收** | `modules/attachments/routes.ts` | `export-attachment.test.ts`（PDF 上传/下载、伪装、越权） | 仅 PDF≤20MB；删除/清理 F 未选做 |
+| R17 附件 | M + F | **已验收** | `modules/attachments/routes.ts` | `export-attachment.test.ts`、`f-extensions.test.ts`（PNG/伪装/越权） | PDF/PNG/JPG≤20MB；删除/清理 F 未选做 |
 | R18 导入 | M | **不适用** | 无导入接口；基础数据页面维护 | 范围表 M 允许不提供；README/PRD 说明 | F 导入未选做；不提供空壳 |
 | R19 导出 | M | **已验收** | `modules/exports/routes.ts` | `export-attachment.test.ts`（xlsx、空表头、鉴权） | 订单列表；其他报表 F 未选做 |
-| R20 通知 | M | **已验收** | `common/events.ts`、`modules/notifications/routes.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts` | 关键事件通知管理员；未读一致；全部已读为 F 切片 |
+| R20 通知 | M + F | **已验收** | `common/events.ts`、`modules/notifications/routes.ts`、`reminders.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`、`f-extensions.test.ts` | 关键事件通知；未读一致；7 天/逾期交期提醒每日去重 |
 | R21 看板 | M | **已验收** | `modules/dashboard/routes.ts`、`DashboardPage.tsx` | `notifications-dashboard.test.ts`（状态和=总数）、看板截图 | 真实数据；空集 0；无虚构效率 |
 | R22 异常上报 | M | **已验收** | `modules/exceptions/routes.ts` | `notifications-dashboard.test.ts`（关联、跨部门、不改数量） | 上报/查看；处理状态 F 未启用 |
 | R23 审计 | M | **已验收** | `common/audit.ts`、`modules/audit/routes.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`（脱敏/只读） | 关键写操作 + 失败；管理员检索为 F 切片 |
 | R24 重试与弱网 | M | **已验收** | `frontend/src/lib/api.ts`、`hooks.ts`、各表单 | `network-retry.spec.ts`（结果未知、草稿恢复、同键重试仅一单） | 持久待同步队列 F 未选做；本版本机草稿 |
-| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 41 测试 | 事务/约束/幂等/条件更新；测试见报告 |
+| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 44 测试 | 事务/约束/幂等/条件更新；测试见报告 |
 | R26 环境交付 | M | **已验收** | `config.ts`、`migrate.ts`、`seed.ts`、`scripts/backup|restore` | 干净目录安装/迁移/构建/启动（日志）、备份恢复新实例核对 | 单机；无远程部署 |
 | R27 AI 与文档 | M | **已验收** | PRD/README/AGENTS/CONSTRAINTS/docs/tasks/tests | 文档索引、追溯表、测试报告、AI 说明 | 与当前版本一致；未实现项如实标注 |
+
+## 1.3 v1.3.0 F 切片
+
+| 能力 | 状态 | 实现位置 | 证据 |
+| --- | --- | --- | --- |
+| 交期提醒（7 天/逾期，每日去重） | **已验收** | `notifications/reminders.ts` | `f-extensions.test.ts` |
+| 附件 PNG/JPG 扩展 | **已验收** | `attachments/routes.ts`、`OrderPanels.tsx` | `f-extensions.test.ts`（PNG/伪装） |
+| 库存台账 xlsx | **已验收** | `exports/routes.ts`、`InventoryPage.tsx` | `f-extensions.test.ts`（文件/鉴权） |
 
 ## 1.2 v1.2.0 用户追加增强（非原 M）
 
@@ -86,6 +94,6 @@
 
 ## 4. 结论
 
-- R01-R27 中 24 项 M **已验收**；R06、R18 按范围表 **不适用**；R12 为 M 边界并增加用户要求的 12h 待采购撤销；v1.1/v1.2 的协作与追加增强单列，不冒充原 M 范围。
+- R01-R27 中 24 项 M **已验收**；R06、R18 按范围表 **不适用**；R12 为 M 边界并增加用户要求的 12h 待采购撤销；v1.1/v1.2/v1.3 的协作与扩展单列，不冒充原 M 范围。
 - F 只有 R01/R20/R23 的明确切片，其余未选做；未把 F 计入 M 完成度。
 - 失败与修复历史保留在测试报告；没有删测试、放宽断言或关闭类型检查。

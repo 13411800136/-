@@ -76,6 +76,7 @@ test('管理员建单 → 物流到货 → 生产 → 品控 → 包装 → 发�
   await page.getByRole('button', { name: '下发生产' }).first().click();
   const productionDialog = page.getByRole('dialog');
   await expect(productionDialog).toBeVisible();
+  await productionDialog.locator('select').nth(0).selectOption({ label: '生产一部' });
   await productionDialog.getByPlaceholder('1.20').fill('1.20');
   await productionDialog.getByRole('button', { name: '下发任务' }).click();
   await closeDialog(page);

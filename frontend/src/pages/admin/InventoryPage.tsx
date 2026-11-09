@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, History, PackagePlus, Search, SlidersHorizontal } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Download, History, PackagePlus, Search, SlidersHorizontal } from 'lucide-react';
 import { api, errorMessage, isUnknownResult } from '../../lib/api';
 import { fmtDateTime, fmtNumber } from '../../lib/format';
 import { useAsync, useDocumentTitle, useIntentKey } from '../../lib/hooks';
@@ -25,6 +25,7 @@ export function InventoryPage() {
   useDocumentTitle('库存台账');
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('parts');
+  const [exporting, setExporting] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [adjusting, setAdjusting] = useState<
@@ -53,6 +54,26 @@ export function InventoryPage() {
     products.reload();
   };
 
+  const exportInventory = async () => {
+    setExporting(true);
+    try {
+      const { blob, filename } = await api.download('/exports/inventory.xlsx');
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success('库存导出台账已生成', filename);
+    } catch (reason) {
+      toast.error('库存导出失败', errorMessage(reason));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   useEffect(() => {
     setSearchInput('');
     setSearch('');
@@ -65,15 +86,20 @@ export function InventoryPage() {
         title="库存台账"
         description="手工增减、原因留痕、非负约束。到货、投产、包装和发货都不会自动扣减库存。"
         actions={
-          tab === 'products' ? (
-            <Button icon={<PackagePlus size={16} />} onClick={() => setAdjusting({ mode: 'product', item: null })}>
-              新建成品库存
+          <>
+            <Button variant="secondary" icon={<Download size={16} />} loading={exporting} onClick={() => void exportInventory()}>
+              导出库存 xlsx
             </Button>
-          ) : (
-            <span className="hint-chip">
-              <SlidersHorizontal size={14} /> 从下方选择配件调整
-            </span>
-          )
+            {tab === 'products' ? (
+              <Button icon={<PackagePlus size={16} />} onClick={() => setAdjusting({ mode: 'product', item: null })}>
+                新建成品库存
+              </Button>
+            ) : (
+              <span className="hint-chip">
+                <SlidersHorizontal size={14} /> 从下方选择配件调整
+              </span>
+            )}
+          </>
         }
       />
 
