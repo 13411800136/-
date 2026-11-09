@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MessageSquare,
   PackageCheck,
   ScrollText,
   ShieldCheck,
@@ -18,7 +19,7 @@ import {
   X
 } from 'lucide-react';
 import { useAuth } from './AuthContext';
-import { RoleBadge } from '../components/ui';
+import { Button, Modal, RoleBadge } from '../components/ui';
 import { api } from '../lib/api';
 import { initials } from '../lib/format';
 
@@ -35,6 +36,7 @@ const ADMIN_NAV: NavItem[] = [
   { to: '/admin/inventory', label: '库存台账', icon: Boxes },
   { to: '/admin/master', label: '基础数据', icon: Users },
   { to: '/admin/exceptions', label: '现场异常', icon: AlertTriangle },
+  { to: '/messages', label: '内部消息', icon: MessageSquare },
   { to: '/admin/notifications', label: '通知中心', icon: Bell },
   { to: '/admin/audit', label: '审计日志', icon: ScrollText }
 ];
@@ -42,18 +44,22 @@ const ADMIN_NAV: NavItem[] = [
 const ROLE_NAV: Record<string, NavItem[]> = {
   LOGISTICS: [
     { to: '/tablet/logistics', label: '物流工作台', icon: Truck, end: true },
+    { to: '/messages', label: '内部消息', icon: MessageSquare },
     { to: '/tablet/exceptions', label: '异常上报', icon: AlertTriangle }
   ],
   PRODUCTION: [
     { to: '/tablet/production', label: '生产任务', icon: Factory, end: true },
+    { to: '/messages', label: '内部消息', icon: MessageSquare },
     { to: '/tablet/exceptions', label: '异常上报', icon: AlertTriangle }
   ],
   QC: [
     { to: '/tablet/qc', label: '质检队列', icon: ShieldCheck, end: true },
+    { to: '/messages', label: '内部消息', icon: MessageSquare },
     { to: '/tablet/exceptions', label: '异常上报', icon: AlertTriangle }
   ],
   PACKING: [
     { to: '/tablet/packing', label: '包装队列', icon: PackageCheck, end: true },
+    { to: '/messages', label: '内部消息', icon: MessageSquare },
     { to: '/tablet/exceptions', label: '异常上报', icon: AlertTriangle }
   ]
 };
@@ -67,6 +73,7 @@ const TITLES: Array<[RegExp, string]> = [
   [/^\/admin\/exceptions$/, '现场异常'],
   [/^\/admin\/notifications$/, '通知中心'],
   [/^\/admin\/audit$/, '审计日志'],
+  [/^\/messages$/, '内部消息'],
   [/^\/admin$/, '业务看板'],
   [/^\/tablet\/logistics$/, '物流工作台'],
   [/^\/tablet\/production$/, '生产任务'],
@@ -81,6 +88,9 @@ export function AppShell() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [messageUnread, setMessageUnread] = useState(0);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const nav = useMemo(() => {
     if (!user) return [];
@@ -116,11 +126,39 @@ export function AppShell() {
     };
   }, [user?.role, location.pathname]);
 
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const load = () => {
+      api
+        .get<{ unreadCount: number }>('/messages/unread-count')
+        .then((data) => {
+          if (active) setMessageUnread(data.unreadCount);
+        })
+        .catch(() => undefined);
+    };
+    load();
+    const timer = window.setInterval(load, 45_000);
+    const refresh = () => load();
+    window.addEventListener('messages:changed', refresh);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('messages:changed', refresh);
+    };
+  }, [user, location.pathname]);
+
   if (!user) return null;
 
   const onLogout = async () => {
-    await logout();
-    navigate('/login', { replace: true });
+    setLoggingOut(true);
+    try {
+      await logout();
+      setLogoutOpen(false);
+      navigate('/login', { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   return (
@@ -156,7 +194,12 @@ export function AppShell() {
               >
                 <Icon size={18} strokeWidth={1.8} />
                 <span>{item.label}</span>
-                {item.to === '/admin/notifications' && unread > 0 ? <span className="nav-badge">{unread > 99 ? '99+' : unread}</span> : null}
+                {item.to === '/admin/notifications' && unread > 0 ? (
+                  <span className="nav-badge">{unread > 99 ? '99+' : unread}</span>
+                ) : null}
+                {item.to === '/messages' && messageUnread > 0 ? (
+                  <span className="nav-badge">{messageUnread > 99 ? '99+' : messageUnread}</span>
+                ) : null}
               </NavLink>
             );
           })}
@@ -173,7 +216,7 @@ export function AppShell() {
               {user.role === 'ADMIN' ? '系统管理员' : user.departmentName ?? '现场人员'} · <RoleBadge role={user.role} />
             </span>
           </div>
-          <button type="button" className="icon-button icon-button-dark" onClick={() => void onLogout()} aria-label="退出登录" title="退出登录">
+          <button type="button" className="icon-button icon-button-dark" onClick={() => setLogoutOpen(true)} aria-label="退出登录" title="退出登录">
             <LogOut size={17} />
           </button>
         </div>
@@ -213,10 +256,35 @@ export function AppShell() {
           <Outlet />
         </main>
         <footer className="app-footer">
-          <span>厂序 FactoryFlow · v1.0.0</span>
+          <span>厂序 FactoryFlow · v1.1.0</span>
           <span>业务时区 Asia/Shanghai · 仅合成演示数据</span>
         </footer>
       </div>
+
+      <Modal
+        open={logoutOpen}
+        onClose={() => {
+          if (!loggingOut) setLogoutOpen(false);
+        }}
+        title="确认退出登录"
+        subtitle="退出后需要重新输入账号和密码"
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" disabled={loggingOut} onClick={() => setLogoutOpen(false)}>
+              取消
+            </Button>
+            <Button variant="primary" loading={loggingOut} onClick={() => void onLogout()}>
+              确认退出
+            </Button>
+          </>
+        }
+      >
+        <div className="confirm-body">
+          当前账号：<strong>{user.displayName}</strong>。退出登录不会删除任何业务数据或本机草稿。
+        </div>
+        <p className="muted-note">如果只是切换页面，请点“取消”；需要切换身份时再确认退出。</p>
+      </Modal>
     </div>
   );
 }

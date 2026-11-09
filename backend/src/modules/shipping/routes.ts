@@ -51,6 +51,8 @@ export async function registerShippingRoutes(app: FastifyInstance, ctx: AppConte
        JOIN purchase_orders po ON po.order_id = o.id
        JOIN purchase_items pi ON pi.purchase_order_id = po.id
        WHERE o.status = 'PURCHASING'
+         AND COALESCE((SELECT SUM(a.quantity) FROM arrival_records a
+                       WHERE a.purchase_item_id = pi.id), 0) < pi.quantity
        ORDER BY o.due_date, o.created_at`
     );
     const shipments = db.all<{
@@ -97,6 +99,77 @@ export async function registerShippingRoutes(app: FastifyInstance, ctx: AppConte
           remainingQty: Math.max(0, Math.min(row.packed_qty - row.shipped_qty, row.ordered_qty - row.shipped_qty)),
           dueDate: row.due_date
         }))
+    });
+  });
+
+  app.get('/tablet/logistics/history', logistics, async (request, reply) => {
+    const arrivals = db.all<{
+      id: string;
+      order_id: string;
+      order_no: string;
+      product_name: string;
+      spec: string;
+      quantity: number;
+      note: string;
+      operator_name: string;
+      created_at: string;
+    }>(
+      `SELECT a.id, o.id AS order_id, o.order_no, oi.product_name, oi.spec, a.quantity, a.note,
+              u.display_name AS operator_name, a.created_at
+       FROM arrival_records a
+       JOIN purchase_items pi ON pi.id = a.purchase_item_id
+       JOIN purchase_orders po ON po.id = pi.purchase_order_id
+       JOIN orders o ON o.id = po.order_id
+       JOIN order_items oi ON oi.order_id = o.id
+       JOIN users u ON u.id = a.operator_id
+       ORDER BY a.created_at DESC, a.id DESC LIMIT 100`
+    );
+    const shipments = db.all<{
+      id: string;
+      order_id: string;
+      order_no: string;
+      product_name: string;
+      spec: string;
+      quantity: number;
+      carrier: string;
+      tracking_no: string;
+      operator_name: string;
+      created_at: string;
+    }>(
+      `SELECT s.id, o.id AS order_id, o.order_no, oi.product_name, oi.spec, s.quantity,
+              s.carrier, s.tracking_no, u.display_name AS operator_name, s.created_at
+       FROM shipment_records s
+       JOIN orders o ON o.id = s.order_id
+       JOIN order_items oi ON oi.id = s.order_item_id
+       JOIN users u ON u.id = s.operator_id
+       ORDER BY s.created_at DESC, s.id DESC LIMIT 100`
+    );
+    return ok(reply, request, {
+      arrivals: arrivals.map((row) => ({
+        id: row.id,
+        type: 'ARRIVAL',
+        orderId: row.order_id,
+        orderNo: row.order_no,
+        productName: row.product_name,
+        spec: row.spec,
+        quantity: row.quantity,
+        note: row.note,
+        operatorName: row.operator_name,
+        createdAt: row.created_at
+      })),
+      shipments: shipments.map((row) => ({
+        id: row.id,
+        type: 'SHIPMENT',
+        orderId: row.order_id,
+        orderNo: row.order_no,
+        productName: row.product_name,
+        spec: row.spec,
+        quantity: row.quantity,
+        carrier: row.carrier,
+        trackingNo: row.tracking_no,
+        operatorName: row.operator_name,
+        createdAt: row.created_at
+      }))
     });
   });
 

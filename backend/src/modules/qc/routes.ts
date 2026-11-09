@@ -124,6 +124,53 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
     });
   });
 
+  app.get('/tablet/qc/history', qcRole, async (request, reply) => {
+    const rows = db.all<{
+      id: string;
+      order_id: string;
+      order_no: string;
+      product_name: string;
+      spec: string;
+      inspected_qty: number;
+      qualified_qty: number;
+      unqualified_qty: number;
+      decision: string | null;
+      inspector_name: string;
+      decided_by_name: string | null;
+      created_at: string;
+      decided_at: string | null;
+    }>(
+      `SELECT q.id, o.id AS order_id, o.order_no, oi.product_name, oi.spec,
+              q.inspected_qty, q.qualified_qty, q.unqualified_qty, q.decision,
+              i.display_name AS inspector_name, d.display_name AS decided_by_name,
+              q.created_at, q.decided_at
+       FROM qc_records q
+       JOIN production_orders p ON p.id = q.production_order_id
+       JOIN orders o ON o.id = p.order_id
+       JOIN order_items oi ON oi.id = p.order_item_id
+       JOIN users i ON i.id = q.inspector_id
+       LEFT JOIN users d ON d.id = q.decided_by
+       ORDER BY q.created_at DESC, q.id DESC LIMIT 100`
+    );
+    return ok(reply, request, {
+      items: rows.map((row) => ({
+        id: row.id,
+        orderId: row.order_id,
+        orderNo: row.order_no,
+        productName: row.product_name,
+        spec: row.spec,
+        inspectedQty: row.inspected_qty,
+        qualifiedQty: row.qualified_qty,
+        unqualifiedQty: row.unqualified_qty,
+        decision: row.decision,
+        inspectorName: row.inspector_name,
+        decidedByName: row.decided_by_name,
+        createdAt: row.created_at,
+        decidedAt: row.decided_at
+      }))
+    });
+  });
+
   app.post('/production-orders/:id/qc-records', qcRole, async (request, reply) => {
     const { id: taskId } = validate(idParam, request.params);
     const key = requireIdempotencyKey(request);

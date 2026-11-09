@@ -1,6 +1,6 @@
 # API 合同：厂序 FactoryFlow
 
-版本：v1.0.0（2026-11-03）
+版本：v1.1.0（2026-11-09）
 前缀：`/api/v1`；Content-Type：`application/json`（附件上传为 multipart，导出为 xlsx）。
 成功：`{ "data": ..., "requestId": "..." }`；失败：`{ "error": { "code": "...", "message": "...", "details": ... }, "requestId": "..." }`。
 
@@ -73,6 +73,9 @@
 | `GET /tablet/production/history` | PRODUCTION | 本部门历史任务 | — |
 | `POST /production-orders/:id/feedbacks` | PRODUCTION | 本部门反馈；累计≤任务量 | 必需 |
 | `GET /orders/:id/production` | ADMIN | 生产任务汇总 | — |
+| `GET /tablet/logistics/history` | LOGISTICS | 到货/发货历史（最近 100 条） | — |
+| `GET /tablet/qc/history` | QC | 质检录入/处置历史（最近 100 条） | — |
+| `GET /tablet/packing/history` | PACKING | 包装历史（最近 100 条） | — |
 
 ### 2.5 质检、包装、发货
 
@@ -141,6 +144,12 @@
 | `PATCH /exceptions/:id` | ADMIN | 409（处理状态 F 未启用） |
 | `GET /audit-logs` | ADMIN | 分页/资源/结果/关键词筛选 |
 | `DELETE/PATCH /audit-logs/:id` | ADMIN | 409，审计不可改删 |
+| `GET /messages/recipients` | 已认证 | 可联系的其他启用账号（排除自己） |
+| `GET /messages/inbox` | 已认证 | 收件箱 + 未读数 |
+| `GET /messages/sent` | 已认证 | 已发送消息 |
+| `GET /messages/unread-count` | 已认证 | 未读消息数 |
+| `POST /messages` | 已认证 | 发消息；`recipientId`、`body`、可选 `orderId`；需幂等键 |
+| `POST /messages/:id/read` | 接收人 | 标记自己的消息已读 |
 | `GET /health` | 公开 | 进程存活 |
 | `GET /ready` | 公开 | 数据库查询就绪 |
 
@@ -202,8 +211,19 @@
 - 角色：LOGISTICS
 - 请求：`{"quantity":60,"carrier":"顺程物流（演示）","trackingNo":"DEMO-TRK-1"}`
 - 成功 201：`{"data":{"id":"...","shippedQty":60,"orderedQty":100,"completed":false,"orderStatus":"SHIPPING"}}`
-- 拒绝：未触发发货 409；数量超 `min(已包装-已发, 应交-已发)` 409；已完成继续发 409。
+- 拒绝：管理员未确认发货 409；数量超 `min(已包装-已发, 应交-已发)` 409；已完成继续发 409。
 - 足量时：订单置 `COMPLETED`，追加 `ORDER_COMPLETED` 时间线并通知管理员。
+
+### 3.5 内部消息
+
+- 场景：现场角色发现到货破损，联系管理员；管理员也可以联系现场。
+- 方法路径：`POST /messages`
+- 认证：任意启用角色；`Idempotency-Key` 必需
+- 请求：`{"recipientId":"user-uuid","orderId":"order-uuid","body":"外箱有人为破损，请确认是否换货。"}`
+- 成功 201：`{"data":{"id":"...","recipientName":"系统管理员"}}`
+- 拒绝：接收人停用/不存在 400；给自己发 400；关联订单不在职责范围 404；重复键异体 409。
+- 读取：`GET /messages/inbox`（返回未读数）、`GET /messages/sent`、`POST /messages/:id/read`（仅接收人）。
+- 表：`internal_messages`、`audit_logs`、`idempotency_requests`；消息只追加，不提供删除。
 
 ## 4. 前端状态与错误映射
 

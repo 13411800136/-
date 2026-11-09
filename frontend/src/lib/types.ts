@@ -390,6 +390,62 @@ export interface LogisticsQueue {
   }>;
 }
 
+export interface LogisticsHistory {
+  arrivals: Array<{
+    id: string;
+    type: 'ARRIVAL';
+    orderId: string;
+    orderNo: string;
+    productName: string;
+    spec: string;
+    quantity: number;
+    note: string;
+    operatorName: string;
+    createdAt: string;
+  }>;
+  shipments: Array<{
+    id: string;
+    type: 'SHIPMENT';
+    orderId: string;
+    orderNo: string;
+    productName: string;
+    spec: string;
+    quantity: number;
+    carrier: string;
+    trackingNo: string;
+    operatorName: string;
+    createdAt: string;
+  }>;
+}
+
+export interface QcHistoryItem {
+  id: string;
+  orderId: string;
+  orderNo: string;
+  productName: string;
+  spec: string;
+  inspectedQty: number;
+  qualifiedQty: number;
+  unqualifiedQty: number;
+  decision: string | null;
+  inspectorName: string;
+  decidedByName: string | null;
+  createdAt: string;
+  decidedAt: string | null;
+}
+
+export interface PackingHistoryItem {
+  id: string;
+  orderId: string;
+  orderNo: string;
+  productName: string;
+  spec: string;
+  quantity: number;
+  note: string;
+  operatorName: string;
+  createdAt: string;
+}
+
 export interface QcTask {
   productionOrderId: string;
   orderId: string;
@@ -426,6 +482,30 @@ export interface ExceptionItem {
   status: string;
   reporterName: string;
   createdAt: string;
+}
+
+export interface MessageUser {
+  id: string;
+  name: string;
+  role: Role;
+}
+
+export interface MessageItem {
+  id: string;
+  sender: MessageUser;
+  recipient: MessageUser;
+  order: { id: string; orderNo: string } | null;
+  body: string;
+  read: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface MessageRecipient {
+  id: string;
+  displayName: string;
+  role: Role;
+  departmentName: string | null;
 }
 
 export interface AuditItem {

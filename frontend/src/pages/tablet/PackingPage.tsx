@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { CheckCircle2, PackageCheck, RefreshCw } from 'lucide-react';
 import { api, errorMessage, isUnknownResult } from '../../lib/api';
-import { fmtDate } from '../../lib/format';
+import { fmtDate, fmtDateTime } from '../../lib/format';
 import { useAsync, useDocumentTitle, useIntentKey } from '../../lib/hooks';
-import type { PackingTask } from '../../lib/types';
+import type { PackingHistoryItem, PackingTask } from '../../lib/types';
 import {
   Alert,
   Button,
@@ -13,13 +13,20 @@ import {
   LoadingState,
   PageHeader,
   Progress,
+  Tabs,
   TextInput,
   useToast
 } from '../../components/ui';
 
 export function PackingPage() {
   useDocumentTitle('包装队列');
+  const [tab, setTab] = useState<'queue' | 'history'>('queue');
   const queue = useAsync<{ tasks: PackingTask[] }>(() => api.get('/tablet/packing/queue'), []);
+  const history = useAsync<{ items: PackingHistoryItem[] }>(() => api.get('/tablet/packing/history'), []);
+  const refreshAll = () => {
+    queue.reload();
+    history.reload();
+  };
 
   return (
     <div className="stack-lg">
@@ -28,7 +35,7 @@ export function PackingPage() {
         title="包装队列"
         description="只能处理管理员已下发且已有放行量的订单；本次包装不得超过可包装剩余。"
         actions={
-          <Button variant="secondary" size="sm" icon={<RefreshCw size={15} />} onClick={queue.reload}>
+          <Button variant="secondary" size="sm" icon={<RefreshCw size={15} />} onClick={refreshAll}>
             刷新队列
           </Button>
         }
@@ -50,13 +57,23 @@ export function PackingPage() {
         </div>
       </div>
 
-      {queue.loading && !queue.data ? (
-        <LoadingState rows={4} />
-      ) : queue.error && !queue.data ? (
-        <ErrorState error={queue.error} onRetry={queue.reload} />
-      ) : (queue.data?.tasks.length ?? 0) === 0 ? (
-        <EmptyState title="没有待包装任务" description="管理员下发包装后，任务会出现在这里。" icon={<PackageCheck size={26} />} />
-      ) : (
+      <Tabs
+        items={[
+          { value: 'queue', label: '待包装队列', count: queue.data?.tasks.length },
+          { value: 'history', label: '历史记录', count: history.data?.items.length }
+        ]}
+        value={tab}
+        onChange={(value) => setTab(value as 'queue' | 'history')}
+      />
+
+      {tab === 'queue' ? (
+        queue.loading && !queue.data ? (
+          <LoadingState rows={4} />
+        ) : queue.error && !queue.data ? (
+          <ErrorState error={queue.error} onRetry={queue.reload} />
+        ) : (queue.data?.tasks.length ?? 0) === 0 ? (
+          <EmptyState title="没有待包装任务" description="管理员下发包装后，任务会出现在这里。" icon={<PackageCheck size={26} />} />
+        ) : (
         <div className="tablet-grid">
           {queue.data!.tasks.map((task) => (
             <article key={`${task.orderId}:${task.packedQty}`} className="tablet-task">
@@ -91,12 +108,47 @@ export function PackingPage() {
                 </div>
               </div>
               <Progress value={task.packedQty} max={task.orderedQty} tone="orange" />
-              <PackingForm task={task} onDone={queue.reload} />
+              <PackingForm task={task} onDone={refreshAll} />
             </article>
           ))}
         </div>
+        )
+      ) : (
+        <PackingHistoryView data={history.data} loading={history.loading} error={history.error} onRetry={history.reload} />
       )}
       <p className="page-footnote">未处置的质检结果不会增加可包装量；数量以服务端汇总为准。</p>
+    </div>
+  );
+}
+
+function PackingHistoryView({
+  data,
+  loading,
+  error,
+  onRetry
+}: {
+  data: { items: PackingHistoryItem[] } | null;
+  loading: boolean;
+  error: unknown;
+  onRetry: () => void;
+}) {
+  if (loading && !data) return <LoadingState rows={4} />;
+  if (error && !data) return <ErrorState error={error} onRetry={onRetry} />;
+  if ((data?.items.length ?? 0) === 0) {
+    return <EmptyState title="还没有包装历史" description="提交包装记录后，记录会保存在这里。" icon={<PackageCheck size={26} />} />;
+  }
+  return (
+    <div className="tablet-list">
+      {data!.items.map((item) => (
+        <article key={item.id} className="history-row">
+          <span className="soft-badge">包装</span>
+          <span className="task-order-no mono">{item.orderNo}</span>
+          <strong>{item.productName}</strong>
+          <span>{item.quantity} 件</span>
+          <span className="muted">{item.operatorName}</span>
+          <span className="muted">{fmtDateTime(item.createdAt)}</span>
+        </article>
+      ))}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 # 实际测试与验收记录
 
-版本：`v1.0.0`（2026-11-03 工作区版本）
-执行时间：2026-11-03 22:20–22:50（Asia/Shanghai，UTC+08:00）
+版本：`v1.1.0`（2026-11-09 工作区版本；含 2026-11-03 初始验收与 2026-11-09 增量验收）
+执行时间：2026-11-03 22:20–22:50；2026-11-09 增量验证（Asia/Shanghai，UTC+08:00）
 执行人：李嘉磊
 环境：Windows 11；Node.js v24.20.0；npm 11.19.0；Microsoft Edge（Chromium）；SQLite（Node 内置）；端口 8787/8788/8790。
 
@@ -12,7 +12,7 @@
 | 1 | `npm run typecheck` | `backend` | 通过 | strict，无错误 |
 | 2 | `npm run typecheck` | `frontend` | 通过 | strict，无错误 |
 | 3 | `npm run build` | 根目录 | 通过 | 后端 `tsc` + 前端 Vite；前端约 389 KB JS / 61 KB CSS |
-| 4 | `npm run test` | `backend` | **33/33 通过**（约 2.3s） | 独立临时 SQLite；覆盖单元 + 集成 |
+| 4 | `npm run test` | `backend` | **37/37 通过**（v1.1.0，约 6s） | 独立临时 SQLite；覆盖单元 + 集成 |
 | 5 | `npm run test:e2e` | 根目录 | **2/2 通过**（约 27s） | Edge，1440×900；完整闭环 + 响应丢失重试 |
 | 6 | 干净目录 `npm ci` → `npm run setup` → `npm run build` → `npm start` | 新目录 | 通过 | 397 包；迁移/种子/构建/登录/4 条种子订单 |
 | 7 | `node scripts/backup.mjs` | 根目录 | 通过 | 数据库 + 1 个 PDF；manifest SHA-256 |
@@ -21,6 +21,18 @@
 | 10 | `npm run test:acceptance` | 根目录 | **19/19 通过** | 运行中服务的真实 HTTP 冒烟；建单/采购/到货/生产/质检/包装/发货/导出/库存 |
 
 > `npm ci`/`npx playwright` 在 npm 11 下会输出 `allowScripts`/`NO_COLOR` 警告；安装与构建实际成功，Playwright 报告 2 passed。警告不等同失败，但已保留在日志中。
+
+## 1.1 v1.1.0 增量验收（2026-11-09）
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| 后端测试（新增 messages/history 断言） | **37/37 通过** | `npm run test` |
+| 退出登录二次确认（取消/确认） | 通过 | `tests/evidence/e2e/11-logout-confirm.png` |
+| 物流历史记录（已完整到货订单离开待办） | 通过 | `tests/evidence/e2e/11-logistics-history.png`；`order-flow.test.ts` |
+| 内部消息（物流 → 管理员；未读/已读） | 通过 | `tests/evidence/e2e/12-internal-messages.png`；`messages.test.ts` |
+| 基础数据字段名（客户/供应商/配件） | 通过 | `tests/evidence/e2e/13-master-labels.png` |
+| 品控/包装历史 | 通过 | `order-flow.test.ts` 新增断言 |
+| 构建 + 目标目录一键启动 | 通过 | `frontend/dist`、`backend/dist`、8787 健康检查 |
 
 ## 2. 自动化测试清单
 
@@ -31,7 +43,7 @@
 - 成品身份键：大小写/全半角/多余空白规范化；规格不同不合并。
 - 日期：真实日历校验、跨月加天、北京时间自然日。
 
-### 2.2 集成（27）
+### 2.2 集成（31）
 
 | 文件 | 覆盖 | 关键断言 |
 | --- | --- | --- |
@@ -42,10 +54,12 @@
 | `atomicity.test.ts` | A32 | 注入通知写入失败 → 到货/时间线/通知/审计/幂等全部回滚；移除故障后同键重试成功一次 |
 | `export-attachment.test.ts` | R17/R19 | xlsx 真实文件/空表头/现场角色 403；PDF 上传/下载；伪装 PDF 415；txt 415；附件越权 403 |
 | `notifications-dashboard.test.ts` | R20/R21/R22/R23 | 到货通知唯一；已读/全部已读；未读数一致；看板状态和=列表总数；异常跨部门 404、不改数量；审计普通角色 403、删除 409、无明文密码 |
+| `messages.test.ts` | 内部消息 | 物流→管理员发送、同键重放一消息、未读/已读隔离、收件人列表排除自己、不能发给自己、管理员→品控 |
+| `order-flow` 增量 | 岗位历史 | 完整到货离开物流待办；物流/品控/包装历史可查；待办队列不再出现已完成任务 |
 
 ### 2.3 浏览器 E2E（2）
 
-1. **完整闭环**：管理员建单 → 采购 → 物流到货 → 下发生产 → 生产反馈 → 下发质检 → 品控录入 → 管理员 PASS → 下发包装 → 包装 → 触发发货 → 物流发货 → 完成。最终订单状态 COMPLETED，利润 87.80，毛利率 70.24%，13 个时间线事件。
+1. **完整闭环**：管理员建单 → 采购 → 物流到货 → 下发生产 → 生产反馈 → 下发质检 → 品控录入 → 管理员 PASS → 下发包装 → 包装 → 管理员确认发货 → 物流发货 → 完成。最终订单状态 COMPLETED，利润 87.80，毛利率 70.24%，13 个时间线事件。
 2. **响应丢失**：建单表单草稿刷新恢复；POST 真实到达服务端后丢弃响应；页面显示“提交结果未知”；同键重试进入同一订单；按产品名查询仅 1 条。
 
 证据：`tests/evidence/e2e/01-dashboard.png` 至 `10-network-retried-order.png`。

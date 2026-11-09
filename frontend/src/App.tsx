@@ -18,6 +18,7 @@ import { ProductionPage } from './pages/tablet/ProductionPage';
 import { QcPage } from './pages/tablet/QcPage';
 import { PackingPage } from './pages/tablet/PackingPage';
 import { TabletExceptionsPage } from './pages/tablet/ExceptionsPage';
+import { MessagesPage } from './pages/MessagesPage';
 
 function HomeRedirect() {
   const { user } = useAuth();
@@ -165,6 +166,14 @@ export function App() {
                 element={
                   <ProtectedRoute roles={['LOGISTICS', 'PRODUCTION', 'QC', 'PACKING']}>
                     <TabletExceptionsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/messages"
+                element={
+                  <ProtectedRoute>
+                    <MessagesPage />
                   </ProtectedRoute>
                 }
               />

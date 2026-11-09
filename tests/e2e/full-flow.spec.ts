@@ -17,6 +17,9 @@ async function login(page: Page, username: string): Promise<void> {
 
 async function logout(page: Page): Promise<void> {
   await page.getByRole('button', { name: '退出登录' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '确认退出' }).click();
   await page.waitForURL('**/login');
 }
 
@@ -139,8 +142,8 @@ test('管理员建单 → 物流到货 → 生产 → 品控 → 包装 → 发�
   // 触发发货
   await login(page, 'admin');
   await page.goto(orderUrl, { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: '触发发货' }).first().click();
-  await page.getByRole('dialog').getByRole('button', { name: '触发发货' }).click();
+  await page.getByRole('button', { name: '确认发货' }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: '确认发货' }).click();
   await closeDialog(page);
 
   // 物流发货

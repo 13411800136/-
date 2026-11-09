@@ -1,6 +1,6 @@
 # 架构说明：厂序 FactoryFlow
 
-版本/基线：v1.0.0 / 2026-11-03
+版本/基线：v1.1.0 / 2026-11-09
 关联：[PRD](../PRD-factory.md) · [接口合同](api-contract.md) · [数据字典](data-dictionary.md) · [状态与数量](state-and-quantity.md)
 
 ## 1. 系统上下文
@@ -41,13 +41,14 @@
 | `modules/production` | 生产下发、现场任务、反馈、单价开关 | 生产 |
 | `modules/qc` | 质检下发、队列、录入、管理员 PASS | 质检 |
 | `modules/packing` | 包装下发、队列、包装录入、汇总 | 包装 |
-| `modules/shipping` | 物流队列、触发发货、发货登记、汇总 | 发货 |
+| `modules/shipping` | 物流队列、确认发货、发货登记、历史与汇总 | 发货 |
 | `modules/inventory` | 配件/成品台账、原子调整、流水 | 库存 |
 | `modules/attachments` | PDF 上传/列表/下载、类型与大小校验 | 附件 |
 | `modules/exports` | 订单 xlsx（筛选、鉴权、空表头） | 文件 |
 | `modules/notifications` | 未读、已读、全部已读 | 通知 |
 | `modules/dashboard` | 状态、生产、利润、临期、库存汇总 | 看板 |
 | `modules/exceptions` | 现场异常上报/查看、订单选项 | 异常 |
+| `modules/messages` | 内部消息：收件人、收件箱/已发送、未读、已读、职责范围订单关联 | 沟通 |
 | `modules/audit` | 管理员审计检索、禁止改删 | 审计 |
 | `modules/cancellations` | 五个撤销/删除入口统一 409 | 边界 |
 
@@ -62,6 +63,7 @@
 | `lib/hooks.ts` | `useAsync`、本机草稿、稳定幂等键 |
 | `pages/admin/*` | 看板、订单、建单、详情、库存、基础数据、通知、审计、异常 |
 | `pages/tablet/*` | 物流、生产、品控、包装、异常 |
+| `pages/MessagesPage.tsx` | 各角色的内部消息收件箱/已发送/发消息 |
 | `components/ui.tsx` / `Toast.tsx` | 按钮、字段、模态框、状态、表格、提示 |
 
 ## 3. 一次真实请求路径：库存调整

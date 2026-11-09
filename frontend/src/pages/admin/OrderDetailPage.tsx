@@ -171,7 +171,7 @@ export function OrderDetailPage() {
       return { label: '下发包装', icon: <Package size={16} />, onClick: () => setModal({ type: 'packingDispatch' }) };
     }
     if (allowed.includes('TRIGGER_SHIPMENT')) {
-      return { label: '触发发货', icon: <Send size={16} />, onClick: () => setModal({ type: 'shipmentTrigger' }) };
+      return { label: '确认发货', icon: <Send size={16} />, onClick: () => setModal({ type: 'shipmentTrigger' }) };
     }
     return null;
   })();
@@ -509,7 +509,7 @@ export function OrderDetailPage() {
                   </Button>
                 ) : summary.allowedActions.includes('TRIGGER_SHIPMENT') ? (
                   <Button size="sm" variant="secondary" onClick={() => setModal({ type: 'shipmentTrigger' })}>
-                    触发发货
+                    确认发货
                   </Button>
                 ) : null
               }
@@ -731,14 +731,14 @@ export function OrderDetailPage() {
       ) : null}
       {modal?.type === 'shipmentTrigger' ? (
         <ConfirmActionModal
-          title="触发发货"
+          title="确认发货"
           subtitle="物流将看到待发货任务"
           description={
             <>
               已包装 <strong>{summary.quantities.packed}</strong> 件。触发后物流登记发货；足量后订单自动完成。
             </>
           }
-          confirmLabel="触发发货"
+          confirmLabel="确认发货"
           path={`/orders/${order.id}/trigger-shipment`}
           icon={<Send size={16} />}
           onClose={closeModal}
@@ -759,6 +759,6 @@ const ACTION_LABELS: Record<string, string> = {
   DECIDE_QC: '管理员处置质检',
   DISPATCH_PACKING: '下发包装',
   RECORD_PACKING: '等待包装现场录入',
-  TRIGGER_SHIPMENT: '触发发货',
+  TRIGGER_SHIPMENT: '确认发货',
   RECORD_SHIPMENT: '等待物流登记发货'
 };

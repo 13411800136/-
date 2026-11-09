@@ -194,7 +194,7 @@ function ContactTable({
         <thead>
           <tr>
             <th>编码</th>
-            <th>名称</th>
+            <th>{entity === 'customers' ? '客户名称' : '供应商名称'}</th>
             <th>联系方式</th>
             <th>状态</th>
             <th>创建时间</th>
@@ -465,10 +465,17 @@ function MasterModal({
           <div className="form-grid">
             {!isEdit ? (
               <Field label="编码" required hint="唯一，保存时转为大写">
-                <TextInput value={code} onChange={(event) => setCode(event.target.value)} placeholder="例如 CUS-003" />
+                <TextInput
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  placeholder={entity === 'customers' ? '例如 CUS-003' : entity === 'suppliers' ? '例如 SUP-003' : '例如 PART-004'}
+                />
               </Field>
             ) : null}
-            <Field label="名称" required>
+            <Field
+              label={entity === 'customers' ? '客户名称' : entity === 'suppliers' ? '供应商名称' : '配件名称'}
+              required
+            >
               <TextInput value={name} onChange={(event) => setName(event.target.value)} />
             </Field>
             {entity === 'parts' ? (

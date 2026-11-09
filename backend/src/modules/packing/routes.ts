@@ -113,6 +113,41 @@ export async function registerPackingRoutes(app: FastifyInstance, ctx: AppContex
     });
   });
 
+  app.get('/tablet/packing/history', packingRole, async (request, reply) => {
+    const rows = db.all<{
+      id: string;
+      order_id: string;
+      order_no: string;
+      product_name: string;
+      spec: string;
+      quantity: number;
+      note: string;
+      operator_name: string;
+      created_at: string;
+    }>(
+      `SELECT r.id, o.id AS order_id, o.order_no, oi.product_name, oi.spec, r.quantity, r.note,
+              u.display_name AS operator_name, r.created_at
+       FROM packing_records r
+       JOIN orders o ON o.id = r.order_id
+       JOIN order_items oi ON oi.id = r.order_item_id
+       JOIN users u ON u.id = r.operator_id
+       ORDER BY r.created_at DESC, r.id DESC LIMIT 100`
+    );
+    return ok(reply, request, {
+      items: rows.map((row) => ({
+        id: row.id,
+        orderId: row.order_id,
+        orderNo: row.order_no,
+        productName: row.product_name,
+        spec: row.spec,
+        quantity: row.quantity,
+        note: row.note,
+        operatorName: row.operator_name,
+        createdAt: row.created_at
+      }))
+    });
+  });
+
   app.post('/orders/:id/packing-records', packingRole, async (request, reply) => {
     const { id: orderId } = validate(idParam, request.params);
     const key = requireIdempotencyKey(request);

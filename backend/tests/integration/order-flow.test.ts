@@ -316,3 +316,27 @@ test('时间线、通知与审计完整记录', async () => {
   assert.equal(serialized.includes('Demo@2026'), false);
   assert.equal(serialized.includes('password_hash'), false);
 });
+
+test('各现场岗位都有历史记录，已完成的待办不再出现', async () => {
+  const logisticsHistory = await call(env.app, logistics, 'GET', '/tablet/logistics/history');
+  assert.equal(logisticsHistory.statusCode, 200);
+  assert.equal(logisticsHistory.json().data.arrivals.some((row: { orderId: string }) => row.orderId === orderId), true);
+  assert.equal(logisticsHistory.json().data.shipments.some((row: { orderId: string }) => row.orderId === orderId), true);
+
+  const logisticsQueue = await call(env.app, logistics, 'GET', '/tablet/logistics/queue');
+  assert.equal(logisticsQueue.json().data.arrivals.some((row: { orderId: string }) => row.orderId === orderId), false);
+  assert.equal(logisticsQueue.json().data.shipments.some((row: { orderId: string }) => row.orderId === orderId), false);
+
+  const qcHistory = await call(env.app, qc, 'GET', '/tablet/qc/history');
+  assert.equal(qcHistory.statusCode, 200);
+  assert.equal(qcHistory.json().data.items.some((row: { id: string }) => row.id === qcId), true);
+
+  const packingHistory = await call(env.app, pack, 'GET', '/tablet/packing/history');
+  assert.equal(packingHistory.statusCode, 200);
+  assert.equal(packingHistory.json().data.items.some((row: { orderId: string }) => row.orderId === orderId), true);
+
+  const qcQueue = await call(env.app, qc, 'GET', '/tablet/qc/queue');
+  assert.equal(qcQueue.json().data.tasks.length, 0);
+  const packingQueue = await call(env.app, pack, 'GET', '/tablet/packing/queue');
+  assert.equal(packingQueue.json().data.tasks.length, 0);
+});

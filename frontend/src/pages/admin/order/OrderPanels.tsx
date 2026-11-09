@@ -313,7 +313,7 @@ export function DeliverySummary({
         ) : null}
         {onShip ? (
           <Button size="sm" variant="secondary" icon={<Send size={14} />} onClick={onShip}>
-            触发发货
+            确认发货
           </Button>
         ) : null}
         {!onPack && !onShip ? (

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { CheckCircle2, ClipboardCheck, RefreshCw, ShieldCheck } from 'lucide-react';
 import { api, errorMessage, isUnknownResult } from '../../lib/api';
-import { fmtDate } from '../../lib/format';
+import { fmtDate, fmtDateTime } from '../../lib/format';
 import { useAsync, useDocumentTitle, useIntentKey } from '../../lib/hooks';
-import type { QcTask } from '../../lib/types';
+import type { QcHistoryItem, QcTask } from '../../lib/types';
 import {
   Alert,
   Button,
@@ -12,13 +12,20 @@ import {
   Field,
   LoadingState,
   PageHeader,
+  Tabs,
   TextInput,
   useToast
 } from '../../components/ui';
 
 export function QcPage() {
   useDocumentTitle('质检队列');
+  const [tab, setTab] = useState<'queue' | 'history'>('queue');
   const queue = useAsync<{ tasks: QcTask[] }>(() => api.get('/tablet/qc/queue'), []);
+  const history = useAsync<{ items: QcHistoryItem[] }>(() => api.get('/tablet/qc/history'), []);
+  const refreshAll = () => {
+    queue.reload();
+    history.reload();
+  };
 
   return (
     <div className="stack-lg">
@@ -27,7 +34,7 @@ export function QcPage() {
         title="质检队列"
         description="录入检验结果不等于放行。最低实现为一次全合格质检，管理员 PASS 后才进入包装。"
         actions={
-          <Button variant="secondary" size="sm" icon={<RefreshCw size={15} />} onClick={queue.reload}>
+          <Button variant="secondary" size="sm" icon={<RefreshCw size={15} />} onClick={refreshAll}>
             刷新队列
           </Button>
         }
@@ -51,13 +58,23 @@ export function QcPage() {
         </div>
       </div>
 
-      {queue.loading && !queue.data ? (
-        <LoadingState rows={4} />
-      ) : queue.error && !queue.data ? (
-        <ErrorState error={queue.error} onRetry={queue.reload} />
-      ) : (queue.data?.tasks.length ?? 0) === 0 ? (
-        <EmptyState title="没有待质检任务" description="管理员下发质检后，任务会出现在这里。" icon={<ShieldCheck size={26} />} />
-      ) : (
+      <Tabs
+        items={[
+          { value: 'queue', label: '待检队列', count: queue.data?.tasks.length },
+          { value: 'history', label: '历史记录', count: history.data?.items.length }
+        ]}
+        value={tab}
+        onChange={(value) => setTab(value as 'queue' | 'history')}
+      />
+
+      {tab === 'queue' ? (
+        queue.loading && !queue.data ? (
+          <LoadingState rows={4} />
+        ) : queue.error && !queue.data ? (
+          <ErrorState error={queue.error} onRetry={queue.reload} />
+        ) : (queue.data?.tasks.length ?? 0) === 0 ? (
+          <EmptyState title="没有待质检任务" description="管理员下发质检后，任务会出现在这里。" icon={<ShieldCheck size={26} />} />
+        ) : (
         <div className="tablet-grid">
           {queue.data!.tasks.map((task) => (
             <article key={task.productionOrderId} className="tablet-task">
@@ -87,12 +104,51 @@ export function QcPage() {
                   <strong className="highlight">{task.producedQty}</strong>
                 </div>
               </div>
-              <QcForm task={task} onDone={queue.reload} />
+              <QcForm task={task} onDone={refreshAll} />
             </article>
           ))}
         </div>
+        )
+      ) : (
+        <QcHistoryView data={history.data} loading={history.loading} error={history.error} onRetry={history.reload} />
       )}
       <p className="page-footnote">部分合格、返工与报废属于 F 能力，当前版本在 UI 与 API 同时拒绝，不会伪造可包装数量。</p>
+    </div>
+  );
+}
+
+function QcHistoryView({
+  data,
+  loading,
+  error,
+  onRetry
+}: {
+  data: { items: QcHistoryItem[] } | null;
+  loading: boolean;
+  error: unknown;
+  onRetry: () => void;
+}) {
+  if (loading && !data) return <LoadingState rows={4} />;
+  if (error && !data) return <ErrorState error={error} onRetry={onRetry} />;
+  if ((data?.items.length ?? 0) === 0) {
+    return <EmptyState title="还没有质检历史" description="提交质检结果后，记录会保存在这里。" icon={<ClipboardCheck size={26} />} />;
+  }
+  return (
+    <div className="tablet-list">
+      {data!.items.map((item) => (
+        <article key={item.id} className="history-row">
+          <span className={item.decision === 'PASS' ? 'soft-badge' : 'soft-badge soft-badge-warn'}>
+            {item.decision === 'PASS' ? 'PASS' : '待处置'}
+          </span>
+          <span className="task-order-no mono">{item.orderNo}</span>
+          <strong>{item.productName}</strong>
+          <span>
+            {item.qualifiedQty}/{item.inspectedQty} 合格
+          </span>
+          <span className="muted">{item.inspectorName}</span>
+          <span className="muted">{fmtDateTime(item.createdAt)}</span>
+        </article>
+      ))}
     </div>
   );
 }

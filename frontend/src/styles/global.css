@@ -4410,6 +4410,128 @@ button:disabled {
 }
 
 /* ============================================================
+   内部消息
+   ============================================================ */
+
+.messages-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 18px;
+  align-items: start;
+}
+
+.message-compose {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: sticky;
+  top: 86px;
+}
+
+.message-compose .section-title {
+  margin-bottom: 0;
+}
+
+.message-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  overflow: hidden;
+}
+
+.message-item {
+  display: flex;
+  gap: 11px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.message-item:last-child {
+  border-bottom: 0;
+}
+
+.message-unread {
+  background: linear-gradient(90deg, rgba(217, 95, 43, 0.06), transparent 60%);
+}
+
+.message-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--paper-2);
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 650;
+  flex-shrink: 0;
+}
+
+.message-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.message-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.message-head strong {
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.message-head time {
+  margin-left: auto;
+  color: var(--faint);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+
+.message-order {
+  color: var(--teal);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+}
+
+.message-copy p {
+  margin: 6px 0 7px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.message-foot {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.message-unread-label {
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+@media (max-width: 1080px) {
+  .messages-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .message-compose {
+    position: static;
+  }
+}
+
+/* ============================================================
    404
    ============================================================ */
 

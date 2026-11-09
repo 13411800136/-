@@ -1,6 +1,6 @@
 # 功能状态表：R01-R27
 
-版本：v1.0.0 / 2026-11-03
+版本：v1.1.0 / 2026-11-09
 状态定义：**已验收**＝当前版本有真实执行证据；**已实现待验收**＝代码完成但未跑对应场景；**部分实现**＝只完成申报切片；**未实现**；**不适用**＝范围表明确允许或明确不启用。未执行不填“通过”。
 
 ## 1. M 必做逐项状态
@@ -31,9 +31,20 @@
 | R22 异常上报 | M | **已验收** | `modules/exceptions/routes.ts` | `notifications-dashboard.test.ts`（关联、跨部门、不改数量） | 上报/查看；处理状态 F 未启用 |
 | R23 审计 | M | **已验收** | `common/audit.ts`、`modules/audit/routes.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`（脱敏/只读） | 关键写操作 + 失败；管理员检索为 F 切片 |
 | R24 重试与弱网 | M | **已验收** | `frontend/src/lib/api.ts`、`hooks.ts`、各表单 | `network-retry.spec.ts`（结果未知、草稿恢复、同键重试仅一单） | 持久待同步队列 F 未选做；本版本机草稿 |
-| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 33 测试 | 事务/约束/幂等/条件更新；测试见报告 |
+| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 37 测试 | 事务/约束/幂等/条件更新；测试见报告 |
 | R26 环境交付 | M | **已验收** | `config.ts`、`migrate.ts`、`seed.ts`、`scripts/backup|restore` | 干净目录安装/迁移/构建/启动（日志）、备份恢复新实例核对 | 单机；无远程部署 |
 | R27 AI 与文档 | M | **已验收** | PRD/README/AGENTS/CONSTRAINTS/docs/tasks/tests | 文档索引、追溯表、测试报告、AI 说明 | 与当前版本一致；未实现项如实标注 |
+
+## 1.1 v1.1.0 协作增强（非 R 编号）
+
+| 能力 | 状态 | 实现位置 | 证据 |
+| --- | --- | --- | --- |
+| 退出登录二次确认 | **已验收** | `frontend/src/app/AppShell.tsx` | 浏览器：取消保持登录、确认后跳转登录 |
+| “确认发货”文案统一 | **已验收** | 订单详情、包装/发货区、物流队列 | 浏览器截图 |
+| 物流/品控/包装历史记录 | **已验收** | `shipping/routes.ts`、`qc/routes.ts`、`packing/routes.ts` 与页面页签 | `order-flow.test.ts`、物流历史截图 |
+| 现场与管理员内部消息 | **已验收** | `modules/messages/routes.ts`、`pages/MessagesPage.tsx`、`002_internal_messages.sql` | `messages.test.ts`、消息截图 |
+| 完整到货任务离开待办 | **已验收** | 物流队列 SQL 增加累计到货 < 采购量 | `order-flow.test.ts`、实际订单历史截图 |
+| 基础数据字段名按实体区分 | **已验收** | `MasterDataPage.tsx` | 浏览器：客户名称/供应商名称/配件名称 |
 
 ## 2. F 选做与状态
 
@@ -63,6 +74,6 @@
 
 ## 4. 结论
 
-- R01-R27 中 24 项 M **已验收**；R06、R18 按范围表 **不适用**；R12 为 M 边界“明确拒绝”并已测试。
+- R01-R27 中 24 项 M **已验收**；R06、R18 按范围表 **不适用**；R12 为 M 边界“明确拒绝”并已测试；v1.1.0 的协作增强（消息/历史/退出确认等）单列，不计入 R 完成度。
 - F 只有 R01/R20/R23 的明确切片，其余未选做；未把 F 计入 M 完成度。
 - 失败与修复历史保留在测试报告；没有删测试、放宽断言或关闭类型检查。

@@ -3,7 +3,7 @@ import { CheckCircle2, PackageCheck, RefreshCw, Send, Truck } from 'lucide-react
 import { api, errorMessage, isUnknownResult } from '../../lib/api';
 import { fmtDate, fmtDateTime } from '../../lib/format';
 import { useAsync, useDocumentTitle, useIntentKey } from '../../lib/hooks';
-import type { LogisticsQueue } from '../../lib/types';
+import type { LogisticsHistory, LogisticsQueue } from '../../lib/types';
 import {
   Alert,
   Button,
@@ -20,9 +20,14 @@ import {
 
 export function LogisticsPage() {
   useDocumentTitle('物流工作台');
-  const [tab, setTab] = useState<'arrivals' | 'shipments'>('arrivals');
+  const [tab, setTab] = useState<'arrivals' | 'shipments' | 'history'>('arrivals');
   const queue = useAsync<LogisticsQueue>(() => api.get('/tablet/logistics/queue'), []);
+  const history = useAsync<LogisticsHistory>(() => api.get('/tablet/logistics/history'), []);
   const data = queue.data;
+  const refreshAll = () => {
+    queue.reload();
+    history.reload();
+  };
 
   return (
     <div className="stack-lg">
@@ -31,7 +36,7 @@ export function LogisticsPage() {
         title="物流工作台"
         description="登记本次到货或发货数量；服务端按累计量校验，重复提交使用同一幂等键，不会重复入账。"
         actions={
-          <Button variant="secondary" size="sm" icon={<RefreshCw size={15} />} onClick={queue.reload}>
+          <Button variant="secondary" size="sm" icon={<RefreshCw size={15} />} onClick={refreshAll}>
             刷新队列
           </Button>
         }
@@ -57,10 +62,15 @@ export function LogisticsPage() {
       <Tabs
         items={[
           { value: 'arrivals', label: '到货登记', count: data?.arrivals.length },
-          { value: 'shipments', label: '发货登记', count: data?.shipments.length }
+          { value: 'shipments', label: '发货登记', count: data?.shipments.length },
+          {
+            value: 'history',
+            label: '历史记录',
+            count: (history.data?.arrivals.length ?? 0) + (history.data?.shipments.length ?? 0)
+          }
         ]}
         value={tab}
-        onChange={(value) => setTab(value as 'arrivals' | 'shipments')}
+        onChange={(value) => setTab(value as 'arrivals' | 'shipments' | 'history')}
       />
 
       {queue.loading && !data ? (
@@ -110,9 +120,10 @@ export function LogisticsPage() {
             ))}
           </div>
         )
-      ) : (data?.shipments.length ?? 0) === 0 ? (
-        <EmptyState title="没有待发货任务" description="管理员触发发货后，任务会出现在这里。" icon={<Send size={26} />} />
-      ) : (
+      ) : tab === 'shipments' ? (
+        (data?.shipments.length ?? 0) === 0 ? (
+          <EmptyState title="没有待发货任务" description="管理员确认发货后，任务会出现在这里。" icon={<Send size={26} />} />
+        ) : (
         <div className="tablet-grid">
           {data!.shipments.map((shipment) => (
             <article key={`${shipment.orderId}:${shipment.shippedQty}`} className="tablet-task">
@@ -147,8 +158,52 @@ export function LogisticsPage() {
             </article>
           ))}
         </div>
+        )
+      ) : (
+        <LogisticsHistoryView
+          data={history.data}
+          loading={history.loading}
+          error={history.error}
+          onRetry={history.reload}
+        />
       )}
       <p className="page-footnote">到货与发货都不会自动改动配件或成品库存；库存需管理员在台账中手工调整。</p>
+    </div>
+  );
+}
+
+function LogisticsHistoryView({
+  data,
+  loading,
+  error,
+  onRetry
+}: {
+  data: LogisticsHistory | null;
+  loading: boolean;
+  error: unknown;
+  onRetry: () => void;
+}) {
+  if (loading && !data) return <LoadingState rows={4} />;
+  if (error && !data) return <ErrorState error={error} onRetry={onRetry} />;
+  const rows = [
+    ...(data?.arrivals ?? []).map((row) => ({ ...row, kind: '到货' as const })),
+    ...(data?.shipments ?? []).map((row) => ({ ...row, kind: '发货' as const }))
+  ].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  if (rows.length === 0) {
+    return <EmptyState title="还没有物流历史" description="确认登记到货或发货后，记录会保存在这里。" icon={<Truck size={26} />} />;
+  }
+  return (
+    <div className="tablet-list">
+      {rows.map((row) => (
+        <article key={`${row.kind}-${row.id}`} className="history-row">
+          <span className={row.kind === '到货' ? 'soft-badge' : 'soft-badge soft-badge-warn'}>{row.kind}</span>
+          <span className="task-order-no mono">{row.orderNo}</span>
+          <strong>{row.productName}</strong>
+          <span>{row.quantity} 件</span>
+          <span className="muted">{row.operatorName}</span>
+          <span className="muted">{fmtDateTime(row.createdAt)}</span>
+        </article>
+      ))}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 # 状态、数量与金额口径
 
-版本：v1.0.0 / 2026-11-03
+版本：v1.1.0 / 2026-11-09
 关联：[PRD](../PRD-factory.md) · [API 合同](api-contract.md) · [数据字典](data-dictionary.md)
 
 ## 1. 订单主状态
@@ -12,7 +12,7 @@
 | `IN_PRODUCTION` 生产中 | `PENDING_QC` | 下发质检 | 生产反馈累计=任务数量 |
 | `PENDING_QC` 待质检 | `QC_DONE` | 管理员 PASS | 品控已录入；检验量=合格量；一次全检 |
 | `QC_DONE` 质检已放行 | `PACKING` | 下发包装 | 放行量 > 已包装量 |
-| `PACKING` 包装中 | `SHIPPING` | 触发发货 | 已包装量 ≥ 订单应交数量 |
+| `PACKING` 包装中 | `SHIPPING` | 管理员确认发货 | 已包装量 ≥ 订单应交数量 |
 | `SHIPPING` 待发货 | `COMPLETED` | 物流发货 | 本次数量 ≤ min(已包装−已发, 应交−已发)；累计=应交 |
 | `COMPLETED` 已完成 | 无正常下一态 | — | 正常新增动作拒绝；撤销 F 未启用 |
 
@@ -58,7 +58,7 @@ M 没有 `PARTIAL_ARRIVED`、返工回流、混合批次等 F 状态。状态是
 | 质检处置 | ADMIN | QC 已录入未决策；仅 PASS | QC_DONE；放行量 | 409/`FEATURE_NOT_ENABLED` |
 | 下发包装 | ADMIN | QC_DONE；放行>已包装 | PACKING | 409 |
 | 包装 | PACKING | PACKING；≤可包装 | 包装记录；通知 | 409 |
-| 触发发货 | ADMIN | PACKING；已包装≥应交 | SHIPPING | 409 |
+| 确认发货 | ADMIN | PACKING；已包装≥应交 | SHIPPING | 409 |
 | 发货 | LOGISTICS | SHIPPING；≤可发货 | 发货记录；足量 COMPLETED | 409 |
 
 ## 4. 幂等与并发
