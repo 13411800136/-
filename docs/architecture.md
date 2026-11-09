@@ -50,7 +50,7 @@
 | `modules/exceptions` | 现场异常上报/查看、订单选项 | 异常 |
 | `modules/messages` | 内部消息：收件人、收件箱/已发送、未读、已读、职责范围订单关联 | 沟通 |
 | `modules/audit` | 管理员审计检索、禁止改删 | 审计 |
-| `modules/cancellations` | 五个撤销/删除入口统一 409 | 边界 |
+| `modules/cancellations` | 五个撤销/删除入口统一 409；v1.2 待采购 12h 撤销在 orders 模块受控实现 | 边界 |
 
 前端：
 

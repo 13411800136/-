@@ -229,6 +229,13 @@
 - 读取：`GET /messages/inbox`（返回未读数）、`GET /messages/sent`、`POST /messages/:id/read`（仅接收人）。
 - 表：`internal_messages`、`audit_logs`、`idempotency_requests`；消息只追加，不提供删除。
 
+### 3.6 订单扩展操作（v1.2）
+
+- 多部门生产：`POST /orders/:id/production-orders` 可多次调用；`quantity` 为本次拆分数量，累计不得超过订单应交量。订单在 `IN_PRODUCTION` 时仍可新增任务，但不能超过剩余可分配量。
+- 撤销：`POST /orders/:id/cancel`，请求 `{"reason":"客户临时取消"}`。仅 ADMIN；仅 `PENDING_PURCHASE` 且无采购/生产；创建时间 ≤12 小时；写入 `cancelled_at/cancelled_by/cancel_reason`、`ORDER_CANCELLED` 时间线和审计。成功返回有效状态 `CANCELLED`；超时 `409` 且 `details.code=CANCEL_WINDOW_EXPIRED`。
+- 批量确认发货：`POST /orders/batch/confirm-shipment`，请求 `{"orderIds":["..."]}`，1-50 张、去重。逐单校验 `PACKING` 且已包装量≥订单量；任一不满足整批 409，不部分执行。
+- 客户税号/地址：`POST/PATCH /customers` 可选 `taxNo`、`address`；不传或空串不报错。
+
 ## 4. 前端状态与错误映射
 
 | 情况 | 前端表现 | 是否可重试 |
