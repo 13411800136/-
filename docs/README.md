@@ -26,6 +26,10 @@
 | [../tasks/progress.md](../tasks/progress.md) | 当前摘要、阻塞、下一步 | 当前 |
 | [../tests/README.md](../tests/README.md) | 测试入口、隔离、证据、未执行项 | 当前 |
 | [../tests/reports/2026-11-03-acceptance.md](../tests/reports/2026-11-03-acceptance.md) | 实际命令、结果、失败修复、A01-A35 对照 | 当前 |
+| [../tests/reports/2026-11-09-github-readiness.md](../tests/reports/2026-11-09-github-readiness.md) | 干净安装、备份恢复、GitHub 上传前检查 | 当前 |
+| [../GITHUB.md](../GITHUB.md) | GitHub 上传前检查、远程命令、上传后验证 | 当前 |
+| [../SECURITY.md](../SECURITY.md) | 禁止提交内容、演示凭据边界、安全问题报告 | 当前 |
+| [../THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md) | 直接依赖与许可证 | 当前 |
 
 文档维护规则：
 

@@ -137,7 +137,7 @@ npm start
 | 403 | 角色/部门/Origin | 检查账号角色与 `APP_ORIGIN`；不要用前端绕过 |
 | 409 数量 | `error.details` 的 available/remaining | 按剩余量调整；刷新后重试 |
 | 409 幂等 | `details.code` | 同键同体重试；新意图换键 |
-| 413/415 | 文件大小/类型/魔数 | 使用真实 PDF≤20MB |
+| 413/415 | 文件大小/类型/魔数 | 使用真实 PDF/PNG/JPG≤20MB |
 | 500 | requestId + 服务日志 | 查看事务是否回滚；不要重复提交直到确认 |
 | 静态页 404 | `frontend/dist` 是否存在 | `npm run build`；检查 `PUBLIC_DIR` |
 | 数据不一致 | 库存流水/时间线/审计/幂等表 | 用备份恢复；不要手改运行库 |

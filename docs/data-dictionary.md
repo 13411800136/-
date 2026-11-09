@@ -53,7 +53,7 @@
 
 | 表 | 关键字段 | 约束/索引 | 说明 |
 | --- | --- | --- | --- |
-| `attachments` | `id`、`order_id`、`original_name`、`stored_name`、`mime`、`size_bytes`、`sha256`、`uploaded_by`、`created_at` | `stored_name UNIQUE`；`size>0`；订单索引 | 仅 PDF；物理文件在 `uploadDir` |
+| `attachments` | `id`、`order_id`、`original_name`、`stored_name`、`mime`、`size_bytes`、`sha256`、`uploaded_by`、`created_at` | `stored_name UNIQUE`；`size>0`；订单索引 | PDF/PNG/JPG；物理文件在 `uploadDir` |
 | `notifications` | `id`、`recipient_id`、`event_type`、`title`、`body`、`resource_type`、`resource_id`、`dedupe_key`、`read_at`、`created_at` | `dedupe_key UNIQUE`；接收人/未读索引 | 事件去重；已读隔离 |
 | `audit_logs` | `id`、`request_id`、`actor_id`、`actor_name`、`action`、`resource_type`、`resource_id`、`result`、`error_code`、`before_json`、`after_json`、`detail`、`created_at` | `result CHECK`；时间/资源索引 | 只追加；写入前脱敏；管理员可检索 |
 | `tablet_exceptions` | `id`、`order_id`、`production_order_id`、`category`、`description`、`status`、`reporter_id`、`created_at` | FK；`status CHECK('OPEN','RESOLVED')` | M 上报/查看；处理状态 F 未启用 |

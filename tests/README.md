@@ -11,6 +11,7 @@
 | HTTP 验收冒烟 | 根目录；`npm run test:acceptance` | 运行中服务 | 写真实演示库（合成订单） | `tests/reports/acceptance-run.txt` |
 | 备份 | 根目录；`node scripts/backup.mjs` | 运行库可读 | 写 `backups/` | `tests/reports/` |
 | 恢复 | 根目录；`node scripts/restore.mjs --backup <dir> --to <new>` | 备份目录 | 只写新隔离目录 | `tests/reports/` |
+| 上传准备检查 | 根目录；见 `GITHUB.md` | Node 24 + Git | 否（干净目录另建） | `reports/2026-11-09-github-readiness.md` |
 
 ## 隔离防线
 
@@ -28,7 +29,7 @@
 
 ## 已知未执行
 
-- F 场景 A05/A08/A09/A11/A13/A16/A17/A21/A25 未选做，不执行。
+- F 场景中 A05/A08/A09/A13/A16/A17/A21/A25 未选做；A11 多部门生产、A14/A15 相关批量发货已用 v1.2/v1.3 增量测试覆盖。
 - 未做生产级高并发压测（SQLite 单写者）；只做两连接正确性测试，不宣称性能指标。
 - 未做跨浏览器矩阵（仅 Edge/Chromium）；响应式在 1440/1024/390 检查。
 - 未做故障注入之外的网络代理/断网设备级测试；应用层“响应丢失”已用 Playwright 路由模拟。
