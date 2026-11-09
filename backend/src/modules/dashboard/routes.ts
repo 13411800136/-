@@ -4,7 +4,7 @@ import { ok } from '../../common/http.js';
 import { computeProfit, formatCents } from '../../common/money.js';
 import { addDays, businessDate } from '../../common/time.js';
 import type { AppContext } from '../../common/types.js';
-import { ORDER_STATUS_LABELS, type OrderStatus } from '../orders/service.js';
+import { ORDER_STATUS_LABELS, effectiveStatus, type OrderStatus } from '../orders/service.js';
 
 interface Summary {
   statusCounts: Array<{ status: OrderStatus; label: string; count: number }>;
@@ -66,25 +66,35 @@ interface Summary {
 
 function buildSummary(db: AppContext['db'], adminId: string): Summary {
   const statusRows = db.all<{ status: OrderStatus; count: number }>(
-    'SELECT status, COUNT(*) AS count FROM orders GROUP BY status'
+    'SELECT status, COUNT(*) AS count FROM orders WHERE cancelled_at IS NULL GROUP BY status'
+  );
+  const cancelledRow = db.get<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM orders WHERE cancelled_at IS NOT NULL'
   );
   const statusCounts = (Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((status) => ({
     status,
     label: ORDER_STATUS_LABELS[status],
-    count: statusRows.find((row) => row.status === status)?.count ?? 0
+    count:
+      status === 'CANCELLED'
+        ? cancelledRow?.count ?? 0
+        : statusRows.find((row) => row.status === status)?.count ?? 0
   }));
   const totalOrders = statusCounts.reduce((sum, row) => sum + row.count, 0);
   const completedOrders = statusCounts.find((row) => row.status === 'COMPLETED')?.count ?? 0;
 
   const sales = db.get<{ cents: number }>(
-    'SELECT COALESCE(SUM(quantity * unit_price_cents), 0) AS cents FROM order_items'
+    `SELECT COALESCE(SUM(oi.quantity * oi.unit_price_cents), 0) AS cents
+     FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.cancelled_at IS NULL`
   );
   const purchase = db.get<{ cents: number }>(
-    'SELECT COALESCE(SUM(quantity * unit_price_cents), 0) AS cents FROM purchase_items'
+    `SELECT COALESCE(SUM(pi.quantity * pi.unit_price_cents), 0) AS cents
+     FROM purchase_items pi JOIN purchase_orders po ON po.id = pi.purchase_order_id
+     JOIN orders o ON o.id = po.order_id WHERE o.cancelled_at IS NULL`
   );
   const production = db.get<{ cents: number }>(
     `SELECT COALESCE(SUM(f.quantity * p.unit_price_cents), 0) AS cents
-     FROM production_feedbacks f JOIN production_orders p ON p.id = f.production_order_id`
+     FROM production_feedbacks f JOIN production_orders p ON p.id = f.production_order_id
+     JOIN orders o ON o.id = p.order_id WHERE o.cancelled_at IS NULL`
   );
   const profit = computeProfit({
     salesCents: sales?.cents ?? 0,
@@ -110,7 +120,7 @@ function buildSummary(db: AppContext['db'], adminId: string): Summary {
      JOIN orders o ON o.id = p.order_id
      JOIN order_items oi ON oi.id = p.order_item_id
      JOIN departments d ON d.id = p.department_id
-     WHERE o.status IN ('IN_PRODUCTION', 'PENDING_QC')
+     WHERE o.cancelled_at IS NULL AND o.status IN ('IN_PRODUCTION', 'PENDING_QC')
      ORDER BY o.due_date`
   );
   const completedTaskCount = db.get<{ count: number }>(
@@ -127,17 +137,19 @@ function buildSummary(db: AppContext['db'], adminId: string): Summary {
     customer_name: string;
     due_date: string;
     status: OrderStatus;
+    cancelled_at: string | null;
   }>(
-    `SELECT id, order_no, customer_name, due_date, status FROM orders
-     WHERE status <> 'COMPLETED' AND due_date <= ? ORDER BY due_date, created_at LIMIT 8`,
+    `SELECT id, order_no, customer_name, due_date, status, cancelled_at FROM orders
+     WHERE cancelled_at IS NULL AND status <> 'COMPLETED' AND due_date <= ?
+     ORDER BY due_date, created_at LIMIT 8`,
     dueLimit
   ).map((row) => ({
     orderId: row.id,
     orderNo: row.order_no,
     customerName: row.customer_name,
     dueDate: row.due_date,
-    status: row.status,
-    statusLabel: ORDER_STATUS_LABELS[row.status],
+    status: effectiveStatus(row),
+    statusLabel: ORDER_STATUS_LABELS[effectiveStatus(row)],
     daysLeft: Math.round((Date.parse(`${row.due_date}T00:00:00+08:00`) - Date.parse(`${today}T00:00:00+08:00`)) / 86_400_000)
   }));
 
@@ -163,8 +175,10 @@ function buildSummary(db: AppContext['db'], adminId: string): Summary {
     status: OrderStatus;
     due_date: string;
     created_at: string;
+    cancelled_at: string | null;
   }>(
-    `SELECT o.id, o.order_no, o.customer_name, oi.product_name, oi.quantity, o.status, o.due_date, o.created_at
+    `SELECT o.id, o.order_no, o.customer_name, oi.product_name, oi.quantity, o.status, o.due_date, o.created_at,
+            o.cancelled_at
      FROM orders o JOIN order_items oi ON oi.order_id = o.id
      ORDER BY o.created_at DESC, o.id DESC LIMIT 6`
   ).map((row) => ({
@@ -173,8 +187,8 @@ function buildSummary(db: AppContext['db'], adminId: string): Summary {
     customerName: row.customer_name,
     productName: row.product_name,
     quantity: row.quantity,
-    status: row.status,
-    statusLabel: ORDER_STATUS_LABELS[row.status],
+    status: effectiveStatus(row),
+    statusLabel: ORDER_STATUS_LABELS[effectiveStatus(row)],
     dueDate: row.due_date,
     createdAt: row.created_at
   }));
@@ -188,7 +202,10 @@ function buildSummary(db: AppContext['db'], adminId: string): Summary {
     statusCounts,
     totalOrders,
     completedOrders,
-    activeOrders: totalOrders - completedOrders,
+    activeOrders:
+      totalOrders -
+      completedOrders -
+      (statusCounts.find((row) => row.status === 'CANCELLED')?.count ?? 0),
     profit: {
       sales: formatCents(profit.salesCents),
       purchaseCost: formatCents(profit.purchaseCents),

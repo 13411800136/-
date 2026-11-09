@@ -1,6 +1,6 @@
 # 功能状态表：R01-R27
 
-版本：v1.1.0 / 2026-11-09
+版本：v1.2.0 / 2026-11-09
 状态定义：**已验收**＝当前版本有真实执行证据；**已实现待验收**＝代码完成但未跑对应场景；**部分实现**＝只完成申报切片；**未实现**；**不适用**＝范围表明确允许或明确不启用。未执行不填“通过”。
 
 ## 1. M 必做逐项状态
@@ -13,17 +13,17 @@
 | R04 采购 | M | **已验收** | `modules/purchases/routes.ts` | `order-flow.test.ts`（一单一采购单、价格快照） | 单采购单/单配件；不自动分单 |
 | R05 到货 | M | **已验收** | `modules/purchases/routes.ts` | `order-flow.test.ts`（幂等、超量、权限） | 一次/多次累计；M 演示一次到齐 |
 | R06 电镀 | M | **不适用** | `orders/service.ts` 阶段投影；无电镀接口 | `order-flow.test.ts` 断言 `PLATING:NOT_APPLICABLE`；页面显示不适用 | 范围表明确 M 不启用；不生成伪事件 |
-| R07 生产 | M | **已验收** | `modules/production/routes.ts` | `order-flow.test.ts`（部门隔离、反馈、超量、幂等） | 单部门/单任务；数量锁定订单量 |
+| R07 生产 | M + v1.2 | **已验收** | `modules/production/routes.ts` | `order-flow.test.ts`、`order-ops.test.ts`（多部门 60+40、反馈、超量、幂等） | 支持多任务/多部门；任务累计≤订单量 |
 | R08 单价开关 | M | **已验收** | `modules/production/routes.ts`、`serializeTask` | `order-flow.test.ts`（关闭无 unitPrice，开启后 1.20） | 仅该任务工艺价；其他成本不泄露 |
 | R09 质检 | M | **已验收** | `modules/qc/routes.ts` | `order-flow.test.ts`（录入/放行分离、部分合格拒绝、重复 PASS） | 一次全检全合格；返工/报废 F 未选做 |
 | R10 包装 | M | **已验收** | `modules/packing/routes.ts` | `order-flow.test.ts`（未放行拒绝、超量拒绝） | 单产品；数量≤放行/应交 |
 | R11 发货 | M | **已验收** | `modules/shipping/routes.ts` | `order-flow.test.ts`（超发拒绝、足量完成） | 支持多次累计；M 一次发足 |
-| R12 撤销/删除 | M | **已实现（M 边界）** | `modules/cancellations/routes.ts` | `auth.test.ts`（五类入口 409） | M 只要求未支持时明确拒绝；不删除记录 |
+| R12 撤销/删除 | M + v1.2 | **已实现（M 边界 + 12h 撤销）** | `modules/cancellations/routes.ts`、`orders/routes.ts` | `auth.test.ts`（五类入口 409）、`order-ops.test.ts`（12h/超时/越权） | 仅待采购订单 12h 内管理员可撤销；其他入口仍拒绝；不删除记录 |
 | R13 配件库存 | M | **已验收** | `modules/inventory/routes.ts` | `inventory.test.ts`（增减、非负、幂等、流水） | 手工调整；不自动扣库 |
 | R14 成品库存 | M | **已验收** | `modules/inventory/routes.ts` | `inventory.test.ts`（唯一身份、首建并发、最终 2） | `productKey` 规范化；首次必须正向 |
 | R15 利润 | M | **已验收** | `common/money.ts`、`orders/service.ts` | `money.test.ts`、`order-flow.test.ts`（878.00 / 70.24%） | 预计利润；无电镀成本；非财务结算 |
 | R16 时间线与状态 | M | **已验收** | `common/events.ts`、`orders/service.ts` | `order-flow.test.ts`（13 事件、9 阶段）、E2E 截图 | 直接 PATCH 状态 409；电镀 N/A |
-| R17 附件 | M | **已验收** | `modules/attachments/routes.ts` | `export-attachment.test.ts`（PDF 上传/下载、伪装、越权） | 仅 PDF≤5MB；删除/清理 F 未选做 |
+| R17 附件 | M | **已验收** | `modules/attachments/routes.ts` | `export-attachment.test.ts`（PDF 上传/下载、伪装、越权） | 仅 PDF≤20MB；删除/清理 F 未选做 |
 | R18 导入 | M | **不适用** | 无导入接口；基础数据页面维护 | 范围表 M 允许不提供；README/PRD 说明 | F 导入未选做；不提供空壳 |
 | R19 导出 | M | **已验收** | `modules/exports/routes.ts` | `export-attachment.test.ts`（xlsx、空表头、鉴权） | 订单列表；其他报表 F 未选做 |
 | R20 通知 | M | **已验收** | `common/events.ts`、`modules/notifications/routes.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts` | 关键事件通知管理员；未读一致；全部已读为 F 切片 |
@@ -31,9 +31,21 @@
 | R22 异常上报 | M | **已验收** | `modules/exceptions/routes.ts` | `notifications-dashboard.test.ts`（关联、跨部门、不改数量） | 上报/查看；处理状态 F 未启用 |
 | R23 审计 | M | **已验收** | `common/audit.ts`、`modules/audit/routes.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`（脱敏/只读） | 关键写操作 + 失败；管理员检索为 F 切片 |
 | R24 重试与弱网 | M | **已验收** | `frontend/src/lib/api.ts`、`hooks.ts`、各表单 | `network-retry.spec.ts`（结果未知、草稿恢复、同键重试仅一单） | 持久待同步队列 F 未选做；本版本机草稿 |
-| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 37 测试 | 事务/约束/幂等/条件更新；测试见报告 |
+| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 41 测试 | 事务/约束/幂等/条件更新；测试见报告 |
 | R26 环境交付 | M | **已验收** | `config.ts`、`migrate.ts`、`seed.ts`、`scripts/backup|restore` | 干净目录安装/迁移/构建/启动（日志）、备份恢复新实例核对 | 单机；无远程部署 |
 | R27 AI 与文档 | M | **已验收** | PRD/README/AGENTS/CONSTRAINTS/docs/tasks/tests | 文档索引、追溯表、测试报告、AI 说明 | 与当前版本一致；未实现项如实标注 |
+
+## 1.2 v1.2.0 用户追加增强（非原 M）
+
+| 能力 | 状态 | 实现位置 | 证据 |
+| --- | --- | --- | --- |
+| 附件上限 20MB | **已验收** | `config.ts`、`OrderPanels.tsx` | 浏览器 6MB PDF 上传；原附件测试 |
+| 多部门并行生产 | **已验收** | `production/routes.ts`、订单详情生产卡、`ProductionModal` | `order-ops.test.ts`；多部门截图 |
+| 生产反馈完成即进历史 | **已验收** | 生产队列/历史查询、`ProductionPage.tsx` | 浏览器反馈历史截图 |
+| 客户税号/地址选填 | **已验收** | `master/routes.ts`、`MasterDataPage.tsx`、迁移 003 | `order-ops.test.ts` |
+| 12h 管理员撤销 | **已验收** | `orders/routes.ts`、`CancelOrderModal` | `order-ops.test.ts`；撤销截图 |
+| 批量确认发货 | **已验收** | `orders/batch/confirm-shipment`、订单列表 | `order-ops.test.ts`；批量截图 |
+| 部门管理入口 | **已验收** | `MasterDataPage.tsx` 部门页签 | 浏览器验证 |
 
 ## 1.1 v1.1.0 协作增强（非 R 编号）
 
@@ -74,6 +86,6 @@
 
 ## 4. 结论
 
-- R01-R27 中 24 项 M **已验收**；R06、R18 按范围表 **不适用**；R12 为 M 边界“明确拒绝”并已测试；v1.1.0 的协作增强（消息/历史/退出确认等）单列，不计入 R 完成度。
+- R01-R27 中 24 项 M **已验收**；R06、R18 按范围表 **不适用**；R12 为 M 边界并增加用户要求的 12h 待采购撤销；v1.1/v1.2 的协作与追加增强单列，不冒充原 M 范围。
 - F 只有 R01/R20/R23 的明确切片，其余未选做；未把 F 计入 M 完成度。
 - 失败与修复历史保留在测试报告；没有删测试、放宽断言或关闭类型检查。

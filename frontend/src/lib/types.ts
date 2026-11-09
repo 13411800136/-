@@ -40,6 +40,7 @@ export interface OrderListItem {
   statusLabel: string;
   note: string;
   createdAt: string;
+  cancelledAt?: string | null;
 }
 
 export type OrderStatus =
@@ -50,7 +51,8 @@ export type OrderStatus =
   | 'QC_DONE'
   | 'PACKING'
   | 'SHIPPING'
-  | 'COMPLETED';
+  | 'COMPLETED'
+  | 'CANCELLED';
 
 export type AllowedAction =
   | 'CREATE_PURCHASE'
@@ -85,6 +87,10 @@ export interface OperationSummary {
   quantities: QuantityState;
   allowedActions: AllowedAction[];
   nextStep: string;
+  canCancel: boolean;
+  cancelDeadline: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
   perItem: Array<{
     itemId: string;
     productName: string;
@@ -160,6 +166,8 @@ export interface OrderDetail {
     note: string;
     createdAt: string;
     updatedAt: string;
+    cancelledAt: string | null;
+    cancelReason: string | null;
   };
   items: Array<{
     id: string;
@@ -361,6 +369,13 @@ export interface ProductionTask {
   dueDate: string;
   priceVisible: boolean;
   unitPrice?: string;
+  feedbacks?: Array<{
+    id: string;
+    quantity: number;
+    note: string;
+    operatorName: string;
+    createdAt: string;
+  }>;
   createdAt: string;
 }
 

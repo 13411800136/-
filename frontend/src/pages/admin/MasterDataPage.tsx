@@ -20,13 +20,23 @@ import {
   useToast
 } from '../../components/ui';
 
-type Entity = 'customers' | 'suppliers' | 'parts' | 'users';
+type Entity = 'customers' | 'suppliers' | 'parts' | 'users' | 'departments';
+type MasterEntity = Exclude<Entity, 'departments'>;
+
+const CATEGORY_LABELS: Record<string, string> = {
+  PRODUCTION: '生产',
+  LOGISTICS: '物流',
+  QC: '品控',
+  PACKING: '包装'
+};
 
 interface CustomerRow {
   id: string;
   code: string;
   name: string;
   contact: string;
+  taxNo?: string;
+  address?: string;
   active: boolean;
   createdAt: string;
 }
@@ -64,10 +74,11 @@ export function MasterDataPage() {
   const [tab, setTab] = useState<Entity>('customers');
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<
-    | { mode: 'create'; entity: Entity }
+    | { mode: 'create'; entity: MasterEntity }
     | { mode: 'edit'; entity: 'customers' | 'suppliers' | 'parts'; record: CustomerRow | PartRow }
     | null
   >(null);
+  const [departmentModal, setDepartmentModal] = useState(false);
 
   const customers = useAsync<{ items: CustomerRow[] }>(() => api.get('/customers'), []);
   const suppliers = useAsync<{ items: CustomerRow[] }>(() => api.get('/suppliers'), []);
@@ -101,7 +112,16 @@ export function MasterDataPage() {
     );
   };
 
-  const current = tab === 'customers' ? customers : tab === 'suppliers' ? suppliers : tab === 'parts' ? parts : users;
+  const current =
+    tab === 'customers'
+      ? customers
+      : tab === 'suppliers'
+        ? suppliers
+        : tab === 'parts'
+          ? parts
+          : tab === 'departments'
+            ? departments
+            : users;
 
   return (
     <div className="stack-lg">
@@ -112,9 +132,12 @@ export function MasterDataPage() {
         actions={
           <Button
             icon={tab === 'users' ? <UserPlus size={16} /> : <Plus size={16} />}
-            onClick={() => setModal({ mode: 'create', entity: tab })}
+            onClick={() => {
+              if (tab === 'departments') setDepartmentModal(true);
+              else setModal({ mode: 'create', entity: tab });
+            }}
           >
-            {tab === 'users' ? '新增员工账号' : '新增记录'}
+            {tab === 'users' ? '新增员工账号' : tab === 'departments' ? '新增部门' : '新增记录'}
           </Button>
         }
       />
@@ -125,6 +148,7 @@ export function MasterDataPage() {
             { value: 'customers', label: '客户', count: customers.data?.items.length },
             { value: 'suppliers', label: '供应商', count: suppliers.data?.items.length },
             { value: 'parts', label: '配件', count: parts.data?.items.length },
+            { value: 'departments', label: '部门', count: departments.data?.items.length },
             { value: 'users', label: '员工账号', count: users.data?.items.length }
           ]}
           value={tab}
@@ -157,6 +181,8 @@ export function MasterDataPage() {
           onEdit={(record) => setModal({ mode: 'edit', entity: 'parts', record })}
           onToggle={(row) => void toggleActive('parts', row)}
         />
+      ) : tab === 'departments' ? (
+        <DepartmentsTable rows={filter(departments.data?.items ?? [])} />
       ) : (
         <UsersTable rows={filter(users.data?.items ?? [])} onToggle={(row) => void toggleActive('users', row)} />
       )}
@@ -169,6 +195,15 @@ export function MasterDataPage() {
           onDone={() => {
             setModal(null);
             reloadAll();
+          }}
+        />
+      ) : null}
+      {departmentModal ? (
+        <DepartmentModal
+          onClose={() => setDepartmentModal(false)}
+          onDone={() => {
+            setDepartmentModal(false);
+            departments.reload();
           }}
         />
       ) : null}
@@ -196,6 +231,8 @@ function ContactTable({
             <th>编码</th>
             <th>{entity === 'customers' ? '客户名称' : '供应商名称'}</th>
             <th>联系方式</th>
+            {entity === 'customers' ? <th>税号（选填）</th> : null}
+            {entity === 'customers' ? <th>地址（选填）</th> : null}
             <th>状态</th>
             <th>创建时间</th>
             <th className="actions-col">操作</th>
@@ -209,6 +246,8 @@ function ContactTable({
                 <strong>{row.name}</strong>
               </td>
               <td className="muted">{row.contact || '—'}</td>
+              {entity === 'customers' ? <td className="muted">{row.taxNo || '—'}</td> : null}
+              {entity === 'customers' ? <td className="muted">{row.address || '—'}</td> : null}
               <td>{row.active ? <span className="soft-badge">启用</span> : <span className="soft-badge soft-badge-off">停用</span>}</td>
               <td className="muted">{fmtDateTime(row.createdAt)}</td>
               <td>
@@ -314,6 +353,94 @@ function UsersTable({ rows, onToggle }: { rows: UserRow[]; onToggle: (row: UserR
   );
 }
 
+function DepartmentsTable({ rows }: { rows: DepartmentRow[] }) {
+  if (rows.length === 0) return <EmptyState title="没有部门" description="新增生产、物流、品控或包装部门后，可在下发任务时选择。" />;
+  return (
+    <div className="table-wrap card-table">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>部门编码</th>
+            <th>部门名称</th>
+            <th>类别</th>
+            <th>状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id}>
+              <td className="mono">{row.code}</td>
+              <td>
+                <strong>{row.name}</strong>
+              </td>
+              <td>{CATEGORY_LABELS[row.category] ?? row.category}</td>
+              <td>{row.active ? <span className="soft-badge">启用</span> : <span className="soft-badge soft-badge-off">停用</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function DepartmentModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('PRODUCTION');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!name.trim()) return setError('请填写部门名称');
+    setSubmitting(true);
+    setError(null);
+    try {
+      await api.post('/departments', { name: name.trim(), category });
+      toast.success('部门已创建', '下发生产任务时可以选择该部门');
+      onDone();
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="新增部门"
+      subtitle="生产部门可以承接多个并行的生产任务，提高完成效率"
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            取消
+          </Button>
+          <Button loading={submitting} onClick={() => void submit()}>
+            保存
+          </Button>
+        </>
+      }
+    >
+      <div className="stack">
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        <Field label="部门名称" required>
+          <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="例如 生产三部" maxLength={40} />
+        </Field>
+        <Field label="部门类别" required>
+          <Select value={category} onChange={(event) => setCategory(event.target.value)}>
+            <option value="PRODUCTION">生产</option>
+            <option value="LOGISTICS">物流</option>
+            <option value="QC">品控</option>
+            <option value="PACKING">包装</option>
+          </Select>
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
 function MasterModal({
   state,
   departments,
@@ -321,7 +448,7 @@ function MasterModal({
   onDone
 }: {
   state:
-    | { mode: 'create'; entity: Entity }
+    | { mode: 'create'; entity: MasterEntity }
     | { mode: 'edit'; entity: 'customers' | 'suppliers' | 'parts'; record: CustomerRow | PartRow };
   departments: DepartmentRow[];
   onClose: () => void;
@@ -334,6 +461,8 @@ function MasterModal({
   const [code, setCode] = useState(!isEdit && entity !== 'users' ? '' : (record as CustomerRow | PartRow | null)?.code ?? '');
   const [name, setName] = useState((record as CustomerRow | PartRow | null)?.name ?? '');
   const [contact, setContact] = useState(state.mode === 'edit' && state.entity !== 'parts' ? (state.record as CustomerRow).contact : '');
+  const [taxNo, setTaxNo] = useState(state.mode === 'edit' && state.entity === 'customers' ? (state.record as CustomerRow).taxNo ?? '' : '');
+  const [address, setAddress] = useState(state.mode === 'edit' && state.entity === 'customers' ? (state.record as CustomerRow).address ?? '' : '');
   const [spec, setSpec] = useState(state.mode === 'edit' && state.entity === 'parts' ? (state.record as PartRow).spec : '');
   const [unit, setUnit] = useState(state.mode === 'edit' && state.entity === 'parts' ? (state.record as PartRow).unit : '件');
   const [username, setUsername] = useState('');
@@ -372,14 +501,18 @@ function MasterModal({
         const body =
           entity === 'parts'
             ? { name: name.trim(), spec: spec.trim(), unit: unit.trim() }
-            : { name: name.trim(), contact: contact.trim() };
+            : entity === 'customers'
+              ? { name: name.trim(), contact: contact.trim(), taxNo: taxNo.trim(), address: address.trim() }
+              : { name: name.trim(), contact: contact.trim() };
         await api.patch(`/${entity}/${record!.id}`, body);
         toast.success('基础数据已更新', '历史单据仍保留原快照');
       } else {
         const body =
           entity === 'parts'
             ? { code: code.trim(), name: name.trim(), spec: spec.trim(), unit: unit.trim() }
-            : { code: code.trim(), name: name.trim(), contact: contact.trim() };
+            : entity === 'customers'
+              ? { code: code.trim(), name: name.trim(), contact: contact.trim(), taxNo: taxNo.trim(), address: address.trim() }
+              : { code: code.trim(), name: name.trim(), contact: contact.trim() };
         await api.post(`/${entity}`, body);
         toast.success('记录已创建');
       }
@@ -488,9 +621,21 @@ function MasterModal({
                 </Field>
               </>
             ) : (
-              <Field label="联系方式">
-                <TextInput value={contact} onChange={(event) => setContact(event.target.value)} placeholder="合成联系人 / 合成电话" />
-              </Field>
+              <>
+                <Field label="联系方式">
+                  <TextInput value={contact} onChange={(event) => setContact(event.target.value)} placeholder="合成联系人 / 合成电话" />
+                </Field>
+                {entity === 'customers' ? (
+                  <>
+                    <Field label="税号（选填）" hint="可以不填；仅用于展示与人工对账">
+                      <TextInput value={taxNo} onChange={(event) => setTaxNo(event.target.value)} maxLength={50} placeholder="例如 91310000DEMO0001X" />
+                    </Field>
+                    <Field label="地址（选填）" hint="可以不填">
+                      <TextInput value={address} onChange={(event) => setAddress(event.target.value)} maxLength={200} placeholder="例如 上海市合成路 1 号" />
+                    </Field>
+                  </>
+                ) : null}
+              </>
             )}
           </div>
         )}

@@ -1,6 +1,6 @@
 # 实际测试与验收记录
 
-版本：`v1.1.0`（2026-11-09 工作区版本；含 2026-11-03 初始验收与 2026-11-09 增量验收）
+版本：`v1.2.0`（2026-11-09 工作区版本；含 2026-11-03 初始验收、v1.1/v1.2 增量验收）
 执行时间：2026-11-03 22:20–22:50；2026-11-09 增量验证（Asia/Shanghai，UTC+08:00）
 执行人：李嘉磊
 环境：Windows 11；Node.js v24.20.0；npm 11.19.0；Microsoft Edge（Chromium）；SQLite（Node 内置）；端口 8787/8788/8790。
@@ -12,7 +12,7 @@
 | 1 | `npm run typecheck` | `backend` | 通过 | strict，无错误 |
 | 2 | `npm run typecheck` | `frontend` | 通过 | strict，无错误 |
 | 3 | `npm run build` | 根目录 | 通过 | 后端 `tsc` + 前端 Vite；前端约 389 KB JS / 61 KB CSS |
-| 4 | `npm run test` | `backend` | **37/37 通过**（v1.1.0，约 6s） | 独立临时 SQLite；覆盖单元 + 集成 |
+| 4 | `npm run test` | `backend` | **41/41 通过**（v1.2.0，约 3s） | 独立临时 SQLite；覆盖单元 + 集成 |
 | 5 | `npm run test:e2e` | 根目录 | **2/2 通过**（约 27s） | Edge，1440×900；完整闭环 + 响应丢失重试 |
 | 6 | 干净目录 `npm ci` → `npm run setup` → `npm run build` → `npm start` | 新目录 | 通过 | 397 包；迁移/种子/构建/登录/4 条种子订单 |
 | 7 | `node scripts/backup.mjs` | 根目录 | 通过 | 数据库 + 1 个 PDF；manifest SHA-256 |
@@ -21,6 +21,18 @@
 | 10 | `npm run test:acceptance` | 根目录 | **19/19 通过** | 运行中服务的真实 HTTP 冒烟；建单/采购/到货/生产/质检/包装/发货/导出/库存 |
 
 > `npm ci`/`npx playwright` 在 npm 11 下会输出 `allowScripts`/`NO_COLOR` 警告；安装与构建实际成功，Playwright 报告 2 passed。警告不等同失败，但已保留在日志中。
+
+## 1.2 v1.2.0 增量验收（2026-11-09）
+
+| 项 | 结果 | 证据 |
+| --- | --- | --- |
+| 后端测试（新增撤销/多部门/批量/税号） | **41/41 通过** | `npm run test`、`order-ops.test.ts` |
+| 6MB PDF 上传（上限 20MB） | 通过 | `tests/evidence/e2e/16-cancel-order-confirm.png` 中附件已上传提示 |
+| 多部门并行生产（60+40） | 通过 | `order-ops.test.ts`、`18-multi-department-production.png` |
+| 生产反馈完成离开待办并进历史 | 通过 | `19-production-feedback-history.png` |
+| 12h 撤销（弹窗/原因/列表） | 通过 | `16-cancel-order-confirm.png`、`17-cancelled-order-list.png` |
+| 批量确认发货 | 通过 | `15-batch-shipment.png` |
+| 客户税号/地址选填 | 通过 | `order-ops.test.ts` |
 
 ## 1.1 v1.1.0 增量验收（2026-11-09）
 
@@ -43,7 +55,7 @@
 - 成品身份键：大小写/全半角/多余空白规范化；规格不同不合并。
 - 日期：真实日历校验、跨月加天、北京时间自然日。
 
-### 2.2 集成（31）
+### 2.2 集成（35）
 
 | 文件 | 覆盖 | 关键断言 |
 | --- | --- | --- |
@@ -56,6 +68,7 @@
 | `notifications-dashboard.test.ts` | R20/R21/R22/R23 | 到货通知唯一；已读/全部已读；未读数一致；看板状态和=列表总数；异常跨部门 404、不改数量；审计普通角色 403、删除 409、无明文密码 |
 | `messages.test.ts` | 内部消息 | 物流→管理员发送、同键重放一消息、未读/已读隔离、收件人列表排除自己、不能发给自己、管理员→品控 |
 | `order-flow` 增量 | 岗位历史 | 完整到货离开物流待办；物流/品控/包装历史可查；待办队列不再出现已完成任务 |
+| `order-ops.test.ts` | v1.2 扩展 | 12h 撤销/超时/越权；多部门 60+40 与逐任务质检；批量发货整批校验；客户税号地址选填 |
 
 ### 2.3 浏览器 E2E（2）
 

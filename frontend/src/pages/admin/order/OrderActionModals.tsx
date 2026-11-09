@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, Factory, ShieldCheck } from 'lucide-react';
 import { api, errorMessage, isUnknownResult } from '../../../lib/api';
-import { fmtMoney, today } from '../../../lib/format';
+import { fmtDateTime, fmtMoney, today } from '../../../lib/format';
 import { useIntentKey } from '../../../lib/hooks';
 import type { OrderDetail } from '../../../lib/types';
 import {
@@ -197,6 +197,7 @@ export function ProductionModal({
   item,
   departments,
   employees,
+  remainingToAssign,
   orderDueDate,
   onClose,
   onDone
@@ -205,6 +206,7 @@ export function ProductionModal({
   item: OrderDetail['items'][number];
   departments: DepartmentOption[];
   employees: EmployeeOption[];
+  remainingToAssign: number;
   orderDueDate: string;
   onClose: () => void;
   onDone: () => void;
@@ -213,6 +215,7 @@ export function ProductionModal({
   const [departmentId, setDepartmentId] = useState(productionDepartments[0]?.id ?? '');
   const [assigneeId, setAssigneeId] = useState('');
   const [processName, setProcessName] = useState('精加工与装配');
+  const [quantity, setQuantity] = useState(String(remainingToAssign));
   const [unitPrice, setUnitPrice] = useState('');
   const [dueDate, setDueDate] = useState(orderDueDate >= today() ? orderDueDate : today());
   const [priceVisible, setPriceVisible] = useState(false);
@@ -226,6 +229,8 @@ export function ProductionModal({
   const submit = () => {
     if (!departmentId) return setFieldError('请选择生产部门');
     if (!processName.trim()) return setFieldError('请填写工艺名称');
+    if (!/^\d+$/.test(quantity) || Number(quantity) <= 0) return setFieldError('生产数量必须是正整数');
+    if (Number(quantity) > remainingToAssign) return setFieldError(`本次最多可分配 ${remainingToAssign} 件`);
     if (!/^\d+(\.\d{1,2})?$/.test(unitPrice)) return setFieldError('工艺单价格式不合法');
     void action.run(
       () =>
@@ -236,7 +241,7 @@ export function ProductionModal({
             departmentId,
             assigneeId: assigneeId || null,
             processName: processName.trim(),
-            quantity: item.quantity,
+            quantity: Number(quantity),
             unitPrice,
             dueDate,
             priceVisible
@@ -253,7 +258,7 @@ export function ProductionModal({
       open
       onClose={onClose}
       title="下发生产任务"
-      subtitle="最低实现：单生产部门、单任务覆盖订单全部数量；数量由系统锁定。"
+      subtitle="可按部门拆分多个任务并行生产；本次数量不能超过订单剩余可分配量。"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -308,8 +313,8 @@ export function ProductionModal({
           <Field label="工艺名称" required>
             <TextInput value={processName} onChange={(event) => setProcessName(event.target.value)} maxLength={50} />
           </Field>
-          <Field label="生产数量" hint="最低实现锁定为订单数量">
-            <TextInput value={item.quantity} disabled />
+          <Field label="生产数量" required hint={`订单剩余可分配 ${remainingToAssign} 件`}>
+            <TextInput value={quantity} inputMode="numeric" onChange={(event) => setQuantity(event.target.value)} />
           </Field>
           <Field label="工艺单价（元）" required hint="仅计入有效完成量成本">
             <TextInput value={unitPrice} inputMode="decimal" onChange={(event) => setUnitPrice(event.target.value)} placeholder="1.20" />
@@ -385,6 +390,79 @@ export function ConfirmActionModal({
         {action.error ? <Alert tone="danger">{action.error}</Alert> : null}
         <div className="confirm-body">{description}</div>
         <p className="muted-note">操作将写入业务记录、时间线与审计日志，并用幂等键防重复。</p>
+      </div>
+    </Modal>
+  );
+}
+
+export function CancelOrderModal({
+  orderId,
+  orderNo,
+  deadline,
+  onClose,
+  onDone
+}: {
+  orderId: string;
+  orderNo: string;
+  deadline: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [unknown, setUnknown] = useState(false);
+  const { key } = useIntentKey('cancel-order-');
+  const action = useActionState(onDone);
+  const submit = () => {
+    if (reason.trim().length < 2) {
+      setError('请填写至少 2 个字符的撤销原因');
+      return;
+    }
+    setError(null);
+    setUnknown(false);
+    void action.run(
+      async () => {
+        await api.post(`/orders/${orderId}/cancel`, { reason: reason.trim() }, key);
+      },
+      '订单已撤销',
+      '撤销记录、原因和操作人已写入时间线与审计'
+    );
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="撤销订单"
+      subtitle="谨慎操作：撤销后订单不再继续流转，且不能恢复"
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            取消
+          </Button>
+          <Button variant="danger" loading={action.submitting} onClick={submit}>
+            确认撤销
+          </Button>
+        </>
+      }
+    >
+      <div className="stack">
+        {unknown ? <UnknownAlert retry={submit} submitting={action.submitting} /> : null}
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        {action.error ? <Alert tone="danger">{action.error}</Alert> : null}
+        <Alert tone="warning" title={`仅限创建后 12 小时内`}>
+          {orderNo} 的撤销窗口截止 {fmtDateTime(deadline)}（北京时间）。只有管理员可操作，且订单必须尚未建立采购单。
+        </Alert>
+        <Field label="撤销原因" required hint="会记录到订单时间线和审计日志，不会删除订单">
+          <TextArea
+            rows={3}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            maxLength={200}
+            placeholder="例如：客户临时取消（合成演示）"
+          />
+        </Field>
       </div>
     </Modal>
   );

@@ -136,15 +136,29 @@ export function ProductionPage() {
       ) : (
         <div className="tablet-list">
           {history.data!.tasks.map((task) => (
-            <article key={task.id} className="history-row">
-              <span className="task-order-no mono">{task.orderNo}</span>
-              <strong>{task.productName}</strong>
-              <span>{task.processName}</span>
-              <span>
-                {task.producedQty}/{task.quantity} 件
-              </span>
-              <span className="muted">{task.orderStatusLabel}</span>
-              <span className="muted">{fmtDateTime(task.createdAt)}</span>
+            <article key={task.id} className="production-history-item">
+              <div className="history-row">
+                <span className="task-order-no mono">{task.orderNo}</span>
+                <strong>{task.productName}</strong>
+                <span>{task.processName}</span>
+                <span>
+                  {task.producedQty}/{task.quantity} 件
+                </span>
+                <span className="muted">{task.orderStatusLabel}</span>
+                <span className="muted">{fmtDateTime(task.createdAt)}</span>
+              </div>
+              {task.feedbacks && task.feedbacks.length > 0 ? (
+                <div className="production-feedback-history">
+                  {task.feedbacks.map((feedback) => (
+                    <span key={feedback.id}>
+                      已提交生产反馈 {feedback.quantity} 件 · {feedback.operatorName} · {fmtDateTime(feedback.createdAt)}
+                      {feedback.note ? ` · ${feedback.note}` : ''}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="production-feedback-history muted">尚无反馈记录</div>
+              )}
             </article>
           ))}
         </div>
@@ -187,7 +201,7 @@ function FeedbackForm({ task, onDone }: { task: ProductionTask; onDone: () => vo
   if (done) {
     return (
       <div className="task-success">
-        <CheckCircle2 size={16} /> 已提交，等待队列刷新
+        <CheckCircle2 size={16} /> 已提交生产反馈
       </div>
     );
   }

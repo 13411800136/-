@@ -1,6 +1,6 @@
 # 状态、数量与金额口径
 
-版本：v1.1.0 / 2026-11-09
+版本：v1.2.0 / 2026-11-09
 关联：[PRD](../PRD-factory.md) · [API 合同](api-contract.md) · [数据字典](data-dictionary.md)
 
 ## 1. 订单主状态
@@ -8,7 +8,9 @@
 | 状态 | 合法下一状态 | 触发动作 | 必要条件/守卫 |
 | --- | --- | --- | --- |
 | `PENDING_PURCHASE` 待采购 | `PURCHASING` | 建立采购单 | 客户启用；一单一采购单；供应商/配件启用 |
-| `PURCHASING` 采购中 | `IN_PRODUCTION` | 下发生产 | 采购全部到货（累计=采购量）；单生产任务覆盖订单数量；部门/人员有效 |
+| `PURCHASING` 采购中 | `IN_PRODUCTION` | 下发生产 | 采购全部到货（累计=采购量）；任务数量可拆分，累计分配≤订单量；部门/人员有效 |
+| `PENDING_PURCHASE` 待采购 | `CANCELLED`（派生） | 管理员 12h 内撤销 | 无采购单；创建时间≤12h；原因必填；`cancelled_at` 留痕 |
+| `IN_PRODUCTION` 生产中 | `IN_PRODUCTION` | 新增生产任务 | 任务累计分配仍小于订单量；部门有效 |
 | `IN_PRODUCTION` 生产中 | `PENDING_QC` | 下发质检 | 生产反馈累计=任务数量 |
 | `PENDING_QC` 待质检 | `QC_DONE` | 管理员 PASS | 品控已录入；检验量=合格量；一次全检 |
 | `QC_DONE` 质检已放行 | `PACKING` | 下发包装 | 放行量 > 已包装量 |
@@ -51,7 +53,7 @@ M 没有 `PARTIAL_ARRIVED`、返工回流、混合批次等 F 状态。状态是
 | 建单 | ADMIN | 客户启用；单明细；数量>0；单价≥0；交期≥今天 | 订单 + 明细；PENDING_PURCHASE | 400 |
 | 建采购 | ADMIN | PENDING/PURCHASING；无采购单；供应商/配件启用 | PO + 明细；PURCHASING | 409/400 |
 | 到货 | LOGISTICS | 订单 PURCHASING；累计+本次≤采购量 | 到货记录；通知 | 403/409 |
-| 下发生产 | ADMIN | 到齐；单任务；部门类别 PRODUCTION；人员同部门 | 任务；IN_PRODUCTION | 409/400 |
+| 下发/新增生产 | ADMIN | 到齐；可多任务，累计≤订单量；部门类别 PRODUCTION；人员同部门 | 任务；IN_PRODUCTION | 409/400 |
 | 生产反馈 | PRODUCTION | 本部门；IN_PRODUCTION；累计+本次≤任务量 | 反馈；通知 | 404/409 |
 | 下发质检 | ADMIN | IN_PRODUCTION；全部任务完成；无 QC | PENDING_QC | 409 |
 | 质检录入 | QC | PENDING_QC；一次全检全合格；≤完成量 | QC 记录；通知 | 409 |
@@ -107,7 +109,7 @@ M 没有 `PARTIAL_ARRIVED`、返工回流、混合批次等 F 状态。状态是
 | SHIPPING | 发货 | 发货累计=应交 | SHIPMENT_RECORDED |
 | COMPLETED | 完成 | 状态 COMPLETED | ORDER_COMPLETED |
 
-时间线只显示实际发生的事件；不是前端点亮的流程图。撤销/异常标记属于 F/异常事件，本版不伪造撤销。
+时间线只显示实际发生的事件；不是前端点亮的流程图。v1.2 的撤销仅管理员对 12h 内待采购订单执行，写入 `ORDER_CANCELLED`；其他撤销/删除入口仍不启用。
 
 ## 8. 拒绝示例（可复现）
 

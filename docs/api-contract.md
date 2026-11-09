@@ -1,6 +1,6 @@
 # API 合同：厂序 FactoryFlow
 
-版本：v1.1.0（2026-11-09）
+版本：v1.2.0（2026-11-09）
 前缀：`/api/v1`；Content-Type：`application/json`（附件上传为 multipart，导出为 xlsx）。
 成功：`{ "data": ..., "requestId": "..." }`；失败：`{ "error": { "code": "...", "message": "...", "details": ... }, "requestId": "..." }`。
 
@@ -66,7 +66,9 @@
 | `GET /purchase-orders/:id` | ADMIN | 采购单 + 明细 + 到货 | — |
 | `GET /orders/:id/arrivals` | ADMIN | 该订单到货汇总 | — |
 | `POST /purchase-items/:id/arrivals` | LOGISTICS | 登记本次到货；累计≤采购量 | 必需 |
-| `POST /orders/:id/production-orders` | ADMIN | 下发单生产任务；到齐后 | 必需 |
+| `POST /orders/:id/production-orders` | ADMIN | 下发生产任务；到齐后可拆多部门；累计分配≤订单量 | 必需 |
+| `POST /orders/batch/confirm-shipment` | ADMIN | 批量确认包装足量订单发货；1-50 张；整批校验 | 必需 |
+| `POST /orders/:id/cancel` | ADMIN | 12h 内撤销待采购订单；原因必填 | 必需 |
 | `GET /production-orders/:id` | ADMIN | 任务详情与反馈 | — |
 | `PATCH /production-orders/:id/price-visibility` | ADMIN | 单价开关 | 必需 |
 | `GET /tablet/production/my-tasks` | PRODUCTION | 本部门进行中任务；价格裁剪 | — |
@@ -121,7 +123,9 @@
 
 | 方法/路径 | 角色 | 说明 |
 | --- | --- | --- |
-| `POST /orders/:id/attachments` | ADMIN | multipart `file`；PDF ≤5MB；魔数校验 |
+| `POST /orders/:id/attachments` | ADMIN | multipart `file`；PDF ≤20MB；魔数校验 |
+| `POST /departments` | ADMIN | 新增部门；名称、类别（PRODUCTION/LOGISTICS/QC/PACKING） |
+| `PATCH /customers/:id` | ADMIN | 客户名称/联系方式/税号/地址；税号地址选填 |
 | `GET /orders/:id/attachments` | ADMIN | 附件列表 |
 | `GET /attachments/:id/download` | ADMIN | 鉴权下载，`Content-Disposition` |
 | `GET /exports/orders.xlsx` | ADMIN | 按 `status`/`keyword` 导出真实数据 |

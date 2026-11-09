@@ -11,7 +11,8 @@ export type OrderStatus =
   | 'QC_DONE'
   | 'PACKING'
   | 'SHIPPING'
-  | 'COMPLETED';
+  | 'COMPLETED'
+  | 'CANCELLED';
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   PENDING_PURCHASE: '待采购',
@@ -21,8 +22,20 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   QC_DONE: '质检已放行',
   PACKING: '包装中',
   SHIPPING: '待发货',
-  COMPLETED: '已完成'
+  COMPLETED: '已完成',
+  CANCELLED: '已撤销'
 };
+
+export const CANCEL_WINDOW_MS = 12 * 60 * 60 * 1000;
+
+/** 撤销不改变历史 status 字段，展示层统一映射为 CANCELLED。 */
+export function effectiveStatus(order: Pick<OrderRow, 'status' | 'cancelled_at'>): OrderStatus {
+  return order.cancelled_at ? 'CANCELLED' : order.status;
+}
+
+export function cancelDeadline(createdAt: string): string {
+  return new Date(Date.parse(createdAt) + CANCEL_WINDOW_MS).toISOString();
+}
 
 export interface OrderRow {
   id: string;
@@ -35,6 +48,9 @@ export interface OrderRow {
   created_by: string;
   created_at: string;
   updated_at: string;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancel_reason: string | null;
 }
 
 export interface OrderItemRow {
@@ -281,17 +297,20 @@ export function getQuantityState(db: AppDatabase, order: OrderRow): QuantityStat
   const qcs = getQcRecords(db, order.id);
   const packings = getPacking(db, order.id);
   const shipments = getShipments(db, order.id);
-  const task = productions[0];
-  const qc = qcs[0];
   return {
     ordered: item.quantity,
     purchased: purchase?.item?.quantity ?? 0,
     arrived: purchase?.arrivedQty ?? 0,
-    taskQuantity: task?.quantity ?? null,
+    taskQuantity:
+      productions.length > 0
+        ? productions.reduce((sum, production) => sum + production.quantity, 0)
+        : null,
     produced: productions.reduce((sum, production) => sum + production.producedQty, 0),
-    inspected: qc?.inspected_qty ?? 0,
-    qualified: qc?.qualified_qty ?? 0,
-    released: qc?.decision === 'PASS' ? qc.qualified_qty : 0,
+    inspected: qcs.reduce((sum, record) => sum + record.inspected_qty, 0),
+    qualified: qcs.reduce((sum, record) => sum + record.qualified_qty, 0),
+    released: qcs
+      .filter((record) => record.decision === 'PASS')
+      .reduce((sum, record) => sum + record.qualified_qty, 0),
     packed: packings.reduce((sum, packing) => sum + packing.quantity, 0),
     shipped: shipments.reduce((sum, shipment) => sum + shipment.quantity, 0)
   };
@@ -317,6 +336,10 @@ export interface OperationSummary {
   quantities: QuantityState;
   allowedActions: AllowedAction[];
   nextStep: string;
+  canCancel: boolean;
+  cancelDeadline: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
   perItem: Array<{
     itemId: string;
     productName: string;
@@ -337,42 +360,62 @@ export function buildOperationSummary(db: AppDatabase, order: OrderRow): Operati
   const purchase = getPurchase(db, order.id);
   const productions = getProductions(db, order.id);
   const qcs = getQcRecords(db, order.id);
+  const status = effectiveStatus(order);
+  const withinCancelWindow = Date.now() <= Date.parse(cancelDeadline(order.created_at));
+  const canCancel =
+    status === 'PENDING_PURCHASE' && !purchase && !order.cancelled_at && withinCancelWindow;
 
-  if (order.status === 'PENDING_PURCHASE' && !purchase) allowed.push('CREATE_PURCHASE');
-  if (order.status === 'PURCHASING') {
+  if (status === 'PENDING_PURCHASE' && !purchase) allowed.push('CREATE_PURCHASE');
+  if (status === 'PURCHASING') {
     if (!purchase) allowed.push('CREATE_PURCHASE');
     else if (state.arrived < state.purchased) allowed.push('RECORD_ARRIVAL');
     else if (productions.length === 0) allowed.push('DISPATCH_PRODUCTION');
   }
-  if (order.status === 'IN_PRODUCTION') {
+  if (status === 'IN_PRODUCTION') {
     if (productions.some((production) => production.producedQty < production.quantity)) {
       allowed.push('RECORD_FEEDBACK');
-    } else if (productions.length > 0 && qcs.length === 0) {
+    }
+    if ((state.taskQuantity ?? 0) < state.ordered) {
+      allowed.push('DISPATCH_PRODUCTION');
+    }
+    if (
+      productions.length > 0 &&
+      productions.every((production) => production.producedQty >= production.quantity) &&
+      state.produced >= state.ordered &&
+      qcs.length === 0
+    ) {
       allowed.push('DISPATCH_QC');
     }
   }
-  if (order.status === 'PENDING_QC') {
-    if (qcs.length === 0) allowed.push('RECORD_QC');
-    else if (qcs.every((qc) => qc.decision === null)) allowed.push('DECIDE_QC');
+  if (status === 'PENDING_QC') {
+    const missingQc = productions.some(
+      (production) => !qcs.some((qc) => qc.production_order_id === production.id)
+    );
+    if (missingQc) allowed.push('RECORD_QC');
+    else if (qcs.some((qc) => qc.decision === null)) allowed.push('DECIDE_QC');
   }
-  if (order.status === 'QC_DONE') {
+  if (status === 'QC_DONE') {
     if (state.released > state.packed) allowed.push('DISPATCH_PACKING');
   }
-  if (order.status === 'PACKING') {
+  if (status === 'PACKING') {
     if (state.packed < state.released && state.packed < state.ordered) allowed.push('RECORD_PACKING');
     if (state.packed >= state.ordered && state.packed > state.shipped) allowed.push('TRIGGER_SHIPMENT');
   }
-  if (order.status === 'SHIPPING') {
+  if (status === 'SHIPPING') {
     if (state.shipped < state.packed && state.shipped < state.ordered) allowed.push('RECORD_SHIPMENT');
   }
 
   return {
     orderId: order.id,
-    status: order.status,
-    statusLabel: ORDER_STATUS_LABELS[order.status],
+    status,
+    statusLabel: ORDER_STATUS_LABELS[status],
     quantities: state,
     allowedActions: allowed,
-    nextStep: nextStepOf(order.status, state, hasPurchase),
+    nextStep: nextStepOf(status, state, hasPurchase),
+    canCancel,
+    cancelDeadline: canCancel ? cancelDeadline(order.created_at) : null,
+    cancelledAt: order.cancelled_at,
+    cancelReason: order.cancel_reason,
     perItem: [
       {
         itemId: item.id,
@@ -414,6 +457,8 @@ function nextStepOf(status: OrderStatus, state: QuantityState, hasPurchase: bool
       return `等待物流发货（${state.shipped}/${state.ordered}）`;
     case 'COMPLETED':
       return '订单已完成交付';
+    case 'CANCELLED':
+      return '订单已撤销，不再继续流转';
   }
 }
 
@@ -429,6 +474,20 @@ export interface ProfitView extends ProfitBreakdown {
 }
 
 export function buildProfit(db: AppDatabase, order: OrderRow): ProfitView {
+  if (order.cancelled_at) {
+    const zero = computeProfit({ salesCents: 0, purchaseCents: 0, productionCents: 0 });
+    return {
+      ...zero,
+      orderId: order.id,
+      sales: '0.00',
+      purchaseCost: '0.00',
+      productionCost: '0.00',
+      platingCost: '0.00',
+      profit: '0.00',
+      margin: '0.00',
+      scopeNote: '订单已撤销，不计入预计利润。撤销前未发生采购或生产，因此成本为 0。'
+    };
+  }
   const sales = db.get<{ cents: number }>(
     'SELECT COALESCE(SUM(quantity * unit_price_cents), 0) AS cents FROM order_items WHERE order_id = ?',
     order.id
@@ -496,7 +555,7 @@ export function buildStages(
     PLATING: false,
     PRODUCTION:
       state.taskQuantity !== null && state.taskQuantity > 0 && state.produced >= state.taskQuantity,
-    QC: state.released > 0,
+    QC: state.ordered > 0 && state.released >= state.ordered,
     PACKING: state.ordered > 0 && state.packed >= state.ordered,
     SHIPPING: state.ordered > 0 && state.shipped >= state.ordered,
     COMPLETED: order.status === 'COMPLETED'
@@ -540,17 +599,20 @@ export function getOrderDetail(db: AppDatabase, orderId: string) {
   const qcs = getQcRecords(db, orderId);
   const packing = getPacking(db, orderId);
   const shipments = getShipments(db, orderId);
+  const status = effectiveStatus(order);
   return {
     order: {
       id: order.id,
       orderNo: order.order_no,
-      status: order.status,
-      statusLabel: ORDER_STATUS_LABELS[order.status],
+      status,
+      statusLabel: ORDER_STATUS_LABELS[status],
       customer: { id: order.customer_id, name: order.customer_name },
       dueDate: order.due_date,
       note: order.note,
       createdAt: order.created_at,
-      updatedAt: order.updated_at
+      updatedAt: order.updated_at,
+      cancelledAt: order.cancelled_at,
+      cancelReason: order.cancel_reason
     },
     items: items.map((item) => ({
       id: item.id,
@@ -658,6 +720,12 @@ export function setOrderStatus(db: AppDatabase, orderId: string, status: OrderSt
 }
 
 export function assertOrderStatus(order: OrderRow, allowed: OrderStatus[], message: string): void {
+  if (order.cancelled_at) {
+    throw errors.invalidState('订单已撤销，不能继续执行该动作', {
+      currentStatus: 'CANCELLED',
+      statusLabel: ORDER_STATUS_LABELS.CANCELLED
+    });
+  }
   if (!allowed.includes(order.status)) {
     throw errors.invalidState(message, {
       currentStatus: order.status,

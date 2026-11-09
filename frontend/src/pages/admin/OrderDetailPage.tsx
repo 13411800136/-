@@ -41,6 +41,7 @@ import {
   StageStepper
 } from './order/OrderPanels';
 import {
+  CancelOrderModal,
   ConfirmActionModal,
   ProductionModal,
   PurchaseModal,
@@ -58,6 +59,7 @@ type ModalState =
   | { type: 'qcDecision' }
   | { type: 'packingDispatch' }
   | { type: 'shipmentTrigger' }
+  | { type: 'cancelOrder' }
   | null;
 
 export function OrderDetailPage() {
@@ -65,7 +67,7 @@ export function OrderDetailPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const [modal, setModal] = useState<ModalState>(null);
-  const [visibilityBusy, setVisibilityBusy] = useState(false);
+  const [visibilityBusy, setVisibilityBusy] = useState<string | null>(null);
 
   const detail = useAsync<OrderDetail>(() => api.get(`/orders/${id}`), [id]);
   const timeline = useAsync<{ events: TimelineEvent[] }>(() => api.get(`/orders/${id}/timeline`), [id]);
@@ -120,8 +122,8 @@ export function OrderDetailPage() {
   const item = items[0];
   const due = dueLabel(order.dueDate);
   const orderExceptions = (exceptions.data?.items ?? []).filter((exception) => exception.orderId === order.id);
-  const task = production[0];
-  const qcRecord = qc[0];
+  const remainingToAssign = Math.max(0, (item?.quantity ?? 0) - production.reduce((sum, task) => sum + task.quantity, 0));
+  const qcRecord = qc.find((record) => record.decision === null) ?? qc[0];
 
   const refreshAll = () => {
     detail.reload();
@@ -135,9 +137,8 @@ export function OrderDetailPage() {
     refreshAll();
   };
 
-  const togglePriceVisibility = async () => {
-    if (!task) return;
-    setVisibilityBusy(true);
+  const togglePriceVisibility = async (task: (typeof production)[number]) => {
+    setVisibilityBusy(task.id);
     try {
       await api.patch(
         `/production-orders/${task.id}/price-visibility`,
@@ -149,7 +150,7 @@ export function OrderDetailPage() {
     } catch (reason) {
       toast.error('更新失败', errorMessage(reason));
     } finally {
-      setVisibilityBusy(false);
+      setVisibilityBusy(null);
     }
   };
 
@@ -159,7 +160,7 @@ export function OrderDetailPage() {
       return { label: '建立采购单', icon: <FileText size={16} />, onClick: () => setModal({ type: 'purchase' }) };
     }
     if (allowed.includes('DISPATCH_PRODUCTION')) {
-      return { label: '下发生产', icon: <Factory size={16} />, onClick: () => setModal({ type: 'production' }) };
+      return { label: production.length > 0 ? '新增生产任务' : '下发生产', icon: <Factory size={16} />, onClick: () => setModal({ type: 'production' }) };
     }
     if (allowed.includes('DISPATCH_QC')) {
       return { label: '下发质检', icon: <ShieldCheck size={16} />, onClick: () => setModal({ type: 'qcDispatch' }) };
@@ -217,6 +218,16 @@ export function OrderDetailPage() {
           <Button variant="ghost" size="sm" icon={<RefreshCw size={14} />} onClick={refreshAll}>
             刷新
           </Button>
+          {summary.canCancel ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<AlertTriangle size={14} />}
+              onClick={() => setModal({ type: 'cancelOrder' })}
+            >
+              撤销订单
+            </Button>
+          ) : null}
           {waitingText ? <span className="waiting-chip">{waitingText}</span> : null}
           {adminAction ? (
             <Button icon={adminAction.icon} onClick={adminAction.onClick}>
@@ -226,9 +237,17 @@ export function OrderDetailPage() {
             <span className="complete-chip">
               <CheckCircle2 size={15} /> 已完成交付
             </span>
+          ) : order.status === 'CANCELLED' ? (
+            <span className="waiting-chip">订单已撤销</span>
           ) : null}
         </div>
       </header>
+
+      {order.status === 'CANCELLED' ? (
+        <Alert tone="danger" title="订单已撤销">
+          撤销时间 {fmtDateTime(order.cancelledAt)}，原因：{order.cancelReason || '未填写'}。该记录保留，不能继续采购、生产或发货。
+        </Alert>
+      ) : null}
 
       <Card className="stage-card">
         <StageStepper stages={stages} />
@@ -365,16 +384,16 @@ export function OrderDetailPage() {
           <Card>
             <SectionTitle
               title="生产任务"
-              hint="部门隔离：现场只能处理本部门任务；单价可见性由管理员控制"
+              hint="可按部门拆分多个任务并行生产；现场只能处理本部门任务；单价可见性按任务控制"
               action={
-                !task && summary.allowedActions.includes('DISPATCH_PRODUCTION') ? (
+                summary.allowedActions.includes('DISPATCH_PRODUCTION') ? (
                   <Button size="sm" variant="secondary" onClick={() => setModal({ type: 'production' })}>
-                    下发生产
+                    {production.length > 0 ? '新增生产任务' : '下发生产'}
                   </Button>
                 ) : null
               }
             />
-            {!task ? (
+            {production.length === 0 ? (
               <EmptyState
                 title="尚未下发生产"
                 description="采购全部到齐后，选择生产部门、工艺、人员与单价。"
@@ -382,53 +401,66 @@ export function OrderDetailPage() {
               />
             ) : (
               <div className="stack">
-                <div className="task-card-head">
-                  <div>
-                    <span className="task-dept">{task.department.name}</span>
-                    <strong className="task-process">{task.processName}</strong>
-                    <span className="cell-sub">
-                      {task.assignee ? `指定 ${task.assignee.name}` : '未指定具体人员'} · 交期 {fmtDate(task.dueDate)}
-                    </span>
-                  </div>
-                  <div className="task-head-right">
-                    <span className="money-block">
-                      工艺单价 <strong>{fmtMoney(task.unitPrice)}</strong>
-                    </span>
-                    <PriceVisibility visible={task.priceVisible} onToggle={() => void togglePriceVisibility()} busy={visibilityBusy} />
-                  </div>
-                </div>
-                <div className="task-progress">
-                  <div className="arrival-progress-head">
-                    <span>
-                      完成进度 <strong>{task.producedQty}</strong> / {task.quantity}
-                    </span>
-                    <span>{task.producedQty >= task.quantity ? '已全部反馈' : '现场处理中'}</span>
-                  </div>
-                  <Progress value={task.producedQty} max={task.quantity} />
-                </div>
-                {task.feedbacks.length > 0 ? (
-                  <ul className="record-list">
-                    {task.feedbacks.map((feedback) => (
-                      <li key={feedback.id}>
-                        <span className="record-icon tone-teal">
-                          <ClipboardCheck size={14} />
+                {production.map((task) => (
+                  <div key={task.id} className="production-task-block">
+                    <div className="task-card-head">
+                      <div>
+                        <span className="task-dept">{task.department.name}</span>
+                        <strong className="task-process">{task.processName}</strong>
+                        <span className="cell-sub">
+                          {task.assignee ? `指定 ${task.assignee.name}` : '未指定具体人员'} · 交期 {fmtDate(task.dueDate)}
                         </span>
-                        <div>
-                          <strong>反馈完成 {feedback.quantity} 件</strong>
-                          <span>
-                            {feedback.operatorName} · {fmtDateTime(feedback.createdAt)}
-                            {feedback.note ? ` · ${feedback.note}` : ''}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
+                      </div>
+                      <div className="task-head-right">
+                        <span className="money-block">
+                          工艺单价 <strong>{fmtMoney(task.unitPrice)}</strong>
+                        </span>
+                        <PriceVisibility
+                          visible={task.priceVisible}
+                          onToggle={() => void togglePriceVisibility(task)}
+                          busy={visibilityBusy === task.id}
+                        />
+                      </div>
+                    </div>
+                    <div className="task-progress">
+                      <div className="arrival-progress-head">
+                        <span>
+                          完成进度 <strong>{task.producedQty}</strong> / {task.quantity}
+                        </span>
+                        <span>{task.producedQty >= task.quantity ? '已提交完成，进入历史' : '现场处理中'}</span>
+                      </div>
+                      <Progress value={task.producedQty} max={task.quantity} />
+                    </div>
+                    {task.feedbacks.length > 0 ? (
+                      <ul className="record-list">
+                        {task.feedbacks.map((feedback) => (
+                          <li key={feedback.id}>
+                            <span className="record-icon tone-teal">
+                              <ClipboardCheck size={14} />
+                            </span>
+                            <div>
+                              <strong>反馈完成 {feedback.quantity} 件</strong>
+                              <span>
+                                {feedback.operatorName} · {fmtDateTime(feedback.createdAt)}
+                                {feedback.note ? ` · ${feedback.note}` : ''}
+                              </span>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="muted-note">
+                        等待生产现场提交反馈。单价可见开关为
+                        <strong>{task.priceVisible ? '开启' : '关闭'}</strong>，关闭时现场响应不包含任何价格字段。
+                      </p>
+                    )}
+                  </div>
+                ))}
+                {remainingToAssign > 0 ? (
                   <p className="muted-note">
-                    等待生产现场提交反馈。单价可见开关为
-                    <strong>{task.priceVisible ? '开启' : '关闭'}</strong>，关闭时现场响应不包含任何价格字段。
+                    还有 <strong>{remainingToAssign}</strong> 件未分配到生产任务，可继续新增任务，避免同一部门排长队。
                   </p>
-                )}
+                ) : null}
               </div>
             )}
           </Card>
@@ -464,36 +496,61 @@ export function OrderDetailPage() {
                 <div className="qc-metrics">
                   <div>
                     <span>检验量</span>
-                    <strong>{qcRecord.inspectedQty}</strong>
+                    <strong>{qc.reduce((sum, record) => sum + record.inspectedQty, 0)}</strong>
                   </div>
                   <div>
                     <span>合格量</span>
-                    <strong className="positive">{qcRecord.qualifiedQty}</strong>
+                    <strong className="positive">{qc.reduce((sum, record) => sum + record.qualifiedQty, 0)}</strong>
                   </div>
                   <div>
                     <span>不合格量</span>
-                    <strong className={qcRecord.unqualifiedQty > 0 ? 'negative' : ''}>{qcRecord.unqualifiedQty}</strong>
+                    <strong className={qc.some((record) => record.unqualifiedQty > 0) ? 'negative' : ''}>
+                      {qc.reduce((sum, record) => sum + record.unqualifiedQty, 0)}
+                    </strong>
                   </div>
                   <div>
                     <span>录入人</span>
-                    <strong className="small">{qcRecord.inspectorName}</strong>
+                    <strong className="small">{qc[0]?.inspectorName ?? '—'}</strong>
                   </div>
                   <div>
                     <span>决策</span>
-                    <strong className={qcRecord.decision === 'PASS' ? 'positive' : ''}>
-                      {qcRecord.decision === 'PASS' ? 'PASS 已放行' : '待管理员处置'}
+                    <strong className={qc.every((record) => record.decision === 'PASS') ? 'positive' : ''}>
+                      {qc.every((record) => record.decision === 'PASS')
+                        ? '全部 PASS 已放行'
+                        : `${qc.filter((record) => record.decision === null).length} 条待处置`}
                     </strong>
                   </div>
                 </div>
-                {qcRecord.decision === 'PASS' ? (
+                {qc.every((record) => record.decision === 'PASS') ? (
                   <Alert tone="success" title="质检已放行">
-                    {qcRecord.decidedByName} 于 {fmtDateTime(qcRecord.decidedAt)} 确认放行 {qcRecord.qualifiedQty} 件。
+                    共 {qc.length} 条任务质检已确认，放行 {qc.reduce((sum, record) => sum + record.qualifiedQty, 0)} 件。
                   </Alert>
                 ) : (
                   <Alert tone="warning" title="等待管理员处置">
                     品控保存结果不等于放行。管理员确认 PASS 后，包装队列才会出现可包装数量。
                   </Alert>
                 )}
+                {qc.length > 1 ? (
+                  <ul className="record-list">
+                    {qc.map((record) => (
+                      <li key={record.id}>
+                        <span className="record-icon tone-violet">
+                          <ShieldCheck size={14} />
+                        </span>
+                        <div>
+                          <strong>
+                            检验 {record.inspectedQty} · 合格 {record.qualifiedQty} ·{' '}
+                            {record.decision === 'PASS' ? 'PASS' : '待处置'}
+                          </strong>
+                          <span>
+                            {record.inspectorName} · {fmtDateTime(record.createdAt)}
+                            {record.decidedByName ? ` · ${record.decidedByName} 放行` : ''}
+                          </span>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             )}
           </Card>
@@ -673,6 +730,18 @@ export function OrderDetailPage() {
         </aside>
       </div>
 
+      {modal?.type === 'cancelOrder' && summary.cancelDeadline ? (
+        <CancelOrderModal
+          orderId={order.id}
+          orderNo={order.orderNo}
+          deadline={summary.cancelDeadline}
+          onClose={closeModal}
+          onDone={() => {
+            closeModal();
+            navigate('/admin/orders');
+          }}
+        />
+      ) : null}
       {modal?.type === 'purchase' && item && options.data ? (
         <PurchaseModal
           orderId={order.id}
@@ -689,6 +758,7 @@ export function OrderDetailPage() {
           item={item}
           departments={options.data.departments}
           employees={options.data.employees}
+          remainingToAssign={remainingToAssign}
           orderDueDate={order.dueDate}
           onClose={closeModal}
           onDone={done}

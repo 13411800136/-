@@ -28,6 +28,16 @@ const masterPatch = z.object({
   active: z.boolean().optional()
 });
 
+const customerCreate = masterCreate.extend({
+  taxNo: shortText(50, '税号').default(''),
+  address: shortText(200, '地址').default('')
+});
+
+const customerPatch = masterPatch.extend({
+  taxNo: shortText(50, '税号').optional(),
+  address: shortText(200, '地址').optional()
+});
+
 const listQuery = z.object({
   search: z.string().trim().max(80).optional(),
   active: z.enum(['0', '1']).optional()
@@ -83,13 +93,14 @@ function assertCodeWritable(
   actor: AuthUser,
   before: Record<string, unknown>,
   patch: Record<string, unknown>,
-  requestId: string
+  requestId: string,
+  columnMap: Record<string, string> = {}
 ): void {
   const sets: string[] = [];
   const params: Array<string | number> = [];
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) continue;
-    sets.push(`${key} = ?`);
+    sets.push(`${columnMap[key] ?? key} = ?`);
     params.push(typeof value === 'boolean' ? (value ? 1 : 0) : (value as string));
   }
   if (sets.length === 0) return;
@@ -119,6 +130,7 @@ function registerMasterResource(
     label: string;
     createSchema: typeof masterCreate;
     patchSchema: typeof masterPatch;
+    extraFields?: Array<{ key: string; column: string }>;
   }
 ): void {
   const { db, config } = ctx;
@@ -147,6 +159,9 @@ function registerMasterResource(
         code: row.code,
         name: row.name,
         contact: row.contact,
+        ...Object.fromEntries(
+          (options.extraFields ?? []).map((field) => [field.key, row[field.column] ?? ''])
+        ),
         active: row.active === 1,
         createdAt: row.created_at,
         updatedAt: row.updated_at
@@ -159,17 +174,25 @@ function registerMasterResource(
     const actor = request.auth!.user;
     const id = newId();
     const now = nowIso();
+    const extraInput = input as unknown as Record<string, unknown>;
+    const extraFields = options.extraFields ?? [];
+    const columns = ['id', 'code', 'name', 'contact', ...extraFields.map((field) => field.column), 'active', 'created_at', 'updated_at'];
+    const values = [
+      id,
+      input.code.toUpperCase(),
+      input.name,
+      input.contact,
+      ...extraFields.map((field) => String(extraInput[field.key] ?? '')),
+      1,
+      now,
+      now
+    ];
     try {
       db.tx(() => {
         db.run(
-          `INSERT INTO ${options.table}(id, code, name, contact, active, created_at, updated_at)
-           VALUES (?, ?, ?, ?, 1, ?, ?)`,
-          id,
-          input.code.toUpperCase(),
-          input.name,
-          input.contact,
-          now,
-          now
+          `INSERT INTO ${options.table}(${columns.join(', ')})
+           VALUES (${columns.map(() => '?').join(', ')})`,
+          ...values
         );
         writeAudit(db, {
           requestId: request.id,
@@ -194,7 +217,10 @@ function registerMasterResource(
     const actor = request.auth!.user;
     const before = db.get<Record<string, unknown>>(`SELECT * FROM ${options.table} WHERE id = ?`, id);
     if (!before) throw errors.notFound(`${options.label}不存在`);
-    db.tx(() => assertCodeWritable(db, options.table, id, actor, before, patch, request.id));
+    const columnMap = Object.fromEntries(
+      (options.extraFields ?? []).map((field) => [field.key, field.column])
+    );
+    db.tx(() => assertCodeWritable(db, options.table, id, actor, before, patch, request.id, columnMap));
     return ok(reply, request, { id, updated: true });
   });
 }
@@ -208,8 +234,12 @@ export async function registerMasterRoutes(app: FastifyInstance, ctx: AppContext
     table: 'customers',
     path: 'customers',
     label: '客户',
-    createSchema: masterCreate,
-    patchSchema: masterPatch
+    createSchema: customerCreate,
+    patchSchema: customerPatch,
+    extraFields: [
+      { key: 'taxNo', column: 'tax_no' },
+      { key: 'address', column: 'address' }
+    ]
   });
   registerMasterResource(app, ctx, {
     table: 'suppliers',

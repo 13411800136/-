@@ -29,6 +29,11 @@ import {
   getOrderOrThrow,
   getTimeline,
   ORDER_STATUS_LABELS,
+  effectiveStatus,
+  cancelDeadline,
+  getProductions,
+  getPacking,
+  getSingleItemOrThrow,
   type OrderStatus
 } from './service.js';
 
@@ -47,9 +52,31 @@ const createOrderSchema = z.object({
 
 const listQuery = pageQuery.extend({
   status: z
-    .enum(['PENDING_PURCHASE', 'PURCHASING', 'IN_PRODUCTION', 'PENDING_QC', 'QC_DONE', 'PACKING', 'SHIPPING', 'COMPLETED'])
+    .enum([
+      'PENDING_PURCHASE',
+      'PURCHASING',
+      'IN_PRODUCTION',
+      'PENDING_QC',
+      'QC_DONE',
+      'PACKING',
+      'SHIPPING',
+      'COMPLETED',
+      'CANCELLED'
+    ])
     .optional(),
   keyword: z.string().trim().max(80).optional()
+});
+
+const cancelSchema = z.object({
+  reason: requiredText(200, '撤销原因')
+});
+
+const batchConfirmSchema = z.object({
+  orderIds: z
+    .array(z.string().min(1))
+    .min(1, '请至少选择一张订单')
+    .max(50, '单次最多处理 50 张订单')
+    .refine((ids) => new Set(ids).size === ids.length, '订单不能重复选择')
 });
 
 export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext): Promise<void> {
@@ -61,8 +88,10 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
     const query = validate(listQuery, request.query);
     const where: string[] = [];
     const params: Array<string | number> = [];
-    if (query.status) {
-      where.push('o.status = ?');
+    if (query.status === 'CANCELLED') {
+      where.push('o.cancelled_at IS NOT NULL');
+    } else if (query.status) {
+      where.push('o.cancelled_at IS NULL AND o.status = ?');
       params.push(query.status);
     }
     if (query.keyword) {
@@ -83,13 +112,14 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
       status: OrderStatus;
       note: string;
       created_at: string;
+      cancelled_at: string | null;
       item_id: string;
       product_name: string;
       spec: string;
       quantity: number;
       unit_price_cents: number;
     }>(
-      `SELECT o.id, o.order_no, o.customer_name, o.due_date, o.status, o.note, o.created_at,
+      `SELECT o.id, o.order_no, o.customer_name, o.due_date, o.status, o.note, o.created_at, o.cancelled_at,
               oi.id AS item_id, oi.product_name, oi.spec, oi.quantity, oi.unit_price_cents
        FROM orders o JOIN order_items oi ON oi.order_id = o.id
        ${whereSql}
@@ -101,21 +131,25 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
     );
     const total = totalRow?.total ?? 0;
     return ok(reply, request, {
-      items: rows.map((row) => ({
-        id: row.id,
-        orderNo: row.order_no,
-        customerName: row.customer_name,
-        productName: row.product_name,
-        spec: row.spec,
-        quantity: row.quantity,
-        unitPrice: formatCents(row.unit_price_cents),
-        amount: formatCents(row.quantity * row.unit_price_cents),
-        dueDate: row.due_date,
-        status: row.status,
-        statusLabel: ORDER_STATUS_LABELS[row.status],
-        note: row.note,
-        createdAt: row.created_at
-      })),
+      items: rows.map((row) => {
+        const status = effectiveStatus(row);
+        return {
+          id: row.id,
+          orderNo: row.order_no,
+          customerName: row.customer_name,
+          productName: row.product_name,
+          spec: row.spec,
+          quantity: row.quantity,
+          unitPrice: formatCents(row.unit_price_cents),
+          amount: formatCents(row.quantity * row.unit_price_cents),
+          dueDate: row.due_date,
+          status,
+          statusLabel: ORDER_STATUS_LABELS[status],
+          note: row.note,
+          createdAt: row.created_at,
+          cancelledAt: row.cancelled_at
+        };
+      }),
       pagination: pageMeta(total, query.page, query.pageSize)
     });
   });
@@ -205,6 +239,138 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
             statusLabel: ORDER_STATUS_LABELS.PENDING_PURCHASE
           },
           status: 201,
+          businessId: orderId
+        };
+      }
+    );
+    reply.header('Idempotent-Replayed', String(result.replayed));
+    return ok(reply, request, result.data, result.replayed ? 200 : result.status);
+  });
+
+  app.post('/orders/batch/confirm-shipment', admin, async (request, reply) => {
+    const key = requireIdempotencyKey(request);
+    const input = validate(batchConfirmSchema, request.body);
+    const actor = request.auth!.user;
+
+    const result = runIdempotent(
+      db,
+      { actorId: actor.id, operation: 'order.batch.confirm-shipment', key, payload: input },
+      () => {
+        const now = nowIso();
+        const failures: Array<{ orderId: string; orderNo: string; reason: string }> = [];
+        const eligible: Array<{ order: ReturnType<typeof getOrderOrThrow>; packed: number; itemQty: number }> = [];
+        for (const orderId of input.orderIds) {
+          const order = getOrderOrThrow(db, orderId);
+          const status = effectiveStatus(order);
+          if (status !== 'PACKING') {
+            failures.push({ orderId, orderNo: order.order_no, reason: `当前状态为${ORDER_STATUS_LABELS[status]}` });
+            continue;
+          }
+          const packed = getPacking(db, orderId).reduce((sum, row) => sum + row.quantity, 0);
+          const itemQty = getSingleItemOrThrow(db, orderId).quantity;
+          if (packed < itemQty) {
+            failures.push({ orderId, orderNo: order.order_no, reason: `已包装 ${packed}/${itemQty}，未达到应交量` });
+            continue;
+          }
+          eligible.push({ order, packed, itemQty });
+        }
+        if (failures.length > 0) {
+          throw errors.conflict('批量确认发货失败：存在不满足条件的订单，未执行任何变更', { orders: failures });
+        }
+        for (const { order } of eligible) {
+          db.run('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', 'SHIPPING', now, order.id);
+          addTimeline(db, {
+            orderId: order.id,
+            eventType: 'SHIPMENT_TRIGGERED',
+            actor,
+            resourceType: 'ORDER',
+            resourceId: order.id
+          });
+          writeAudit(db, {
+            requestId: request.id,
+            actor,
+            action: 'ORDER_BATCH_CONFIRM_SHIPMENT',
+            resourceType: 'ORDER',
+            resourceId: order.id,
+            result: 'SUCCESS',
+            before: { status: order.status },
+            after: { status: 'SHIPPING', batchSize: eligible.length }
+          });
+        }
+        return {
+          data: {
+            count: eligible.length,
+            orderIds: eligible.map(({ order }) => order.id),
+            message: `已批量确认 ${eligible.length} 张订单发货`
+          },
+          businessId: null
+        };
+      }
+    );
+    reply.header('Idempotent-Replayed', String(result.replayed));
+    return ok(reply, request, result.data, result.replayed ? 200 : result.status);
+  });
+
+  app.post('/orders/:id/cancel', admin, async (request, reply) => {
+    const { id: orderId } = validate(idParam, request.params);
+    const key = requireIdempotencyKey(request);
+    const input = validate(cancelSchema, request.body);
+    const actor = request.auth!.user;
+
+    const result = runIdempotent(
+      db,
+      { actorId: actor.id, operation: 'order.cancel', key, payload: { orderId, reason: input.reason } },
+      () => {
+        const order = getOrderOrThrow(db, orderId);
+        if (order.cancelled_at) throw errors.conflict('该订单已经撤销，不能重复撤销');
+        if (order.status !== 'PENDING_PURCHASE') {
+          throw errors.invalidState('只有尚未采购的待采购订单可以撤销', {
+            currentStatus: effectiveStatus(order),
+            statusLabel: ORDER_STATUS_LABELS[effectiveStatus(order)]
+          });
+        }
+        const purchase = db.get<{ id: string }>('SELECT id FROM purchase_orders WHERE order_id = ?', orderId);
+        const production = getProductions(db, orderId);
+        if (purchase || production.length > 0) {
+          throw errors.conflict('订单已经进入采购或生产，不能撤销；请保留记录并按人工流程处理');
+        }
+        const deadline = cancelDeadline(order.created_at);
+        if (Date.now() > Date.parse(deadline)) {
+          throw errors.conflict('订单创建已超过 12 小时，不能撤销', {
+            code: 'CANCEL_WINDOW_EXPIRED',
+            deadline
+          });
+        }
+        const now = nowIso();
+        db.run(
+          `UPDATE orders SET cancelled_at = ?, cancelled_by = ?, cancel_reason = ?, updated_at = ?
+           WHERE id = ? AND cancelled_at IS NULL`,
+          now,
+          actor.id,
+          input.reason,
+          now,
+          orderId
+        );
+        addTimeline(db, {
+          orderId,
+          eventType: 'ORDER_CANCELLED',
+          actor,
+          resourceType: 'ORDER',
+          resourceId: orderId,
+          payload: { reason: input.reason, deadline }
+        });
+        writeAudit(db, {
+          requestId: request.id,
+          actor,
+          action: 'ORDER_CANCEL',
+          resourceType: 'ORDER',
+          resourceId: orderId,
+          result: 'SUCCESS',
+          before: { status: order.status, cancelledAt: null },
+          after: { status: 'CANCELLED', cancelledAt: now, reason: input.reason }
+        });
+        return {
+          data: { orderId, status: 'CANCELLED', cancelledAt: now, reason: input.reason },
           businessId: orderId
         };
       }

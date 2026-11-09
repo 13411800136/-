@@ -62,7 +62,7 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   }
   const port = Number(overrides.port ?? process.env.PORT ?? 8787);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('PORT 必须是 1-65535 的整数');
-  const maxUploadMb = Number(process.env.MAX_UPLOAD_MB ?? 5);
+  const maxUploadMb = Number(process.env.MAX_UPLOAD_MB ?? 20);
   if (!Number.isFinite(maxUploadMb) || maxUploadMb <= 0 || maxUploadMb > 50) {
     throw new Error('MAX_UPLOAD_MB 必须是 0-50 之间的数字');
   }

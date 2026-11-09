@@ -36,8 +36,9 @@ interface PackingQueueRow {
 }
 
 function releasedQty(db: AppContext['db'], orderId: string): number {
-  const qc = getQcRecords(db, orderId)[0];
-  return qc?.decision === 'PASS' ? qc.qualified_qty : 0;
+  return getQcRecords(db, orderId)
+    .filter((record) => record.decision === 'PASS')
+    .reduce((sum, record) => sum + record.qualified_qty, 0);
 }
 
 export async function registerPackingRoutes(app: FastifyInstance, ctx: AppContext): Promise<void> {
@@ -96,6 +97,7 @@ export async function registerPackingRoutes(app: FastifyInstance, ctx: AppContex
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id
        WHERE o.status = 'PACKING'
+         AND COALESCE((SELECT SUM(r.quantity) FROM packing_records r WHERE r.order_id = o.id), 0) < oi.quantity
        ORDER BY o.due_date, o.created_at`
     );
     return ok(reply, request, {

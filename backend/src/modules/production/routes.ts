@@ -120,24 +120,37 @@ export async function registerProductionRoutes(app: FastifyInstance, ctx: AppCon
       { actorId: actor.id, operation: 'production.dispatch', key, payload: { orderId, ...input } },
       () => {
         const order = getOrderOrThrow(db, orderId);
-        assertOrderStatus(order, ['PURCHASING'], '只有采购中的订单可以下发生产');
+        assertOrderStatus(
+          order,
+          ['PURCHASING', 'IN_PRODUCTION'],
+          '只有采购中或生产中的订单可以下发生产任务'
+        );
         const purchase = getPurchase(db, orderId);
         if (!purchase?.item) throw errors.invalidState('订单尚未建立采购单，不能下发生产');
-        if (purchase.arrivedQty < purchase.item.quantity) {
-          throw errors.invalidState('采购尚未全部到货；当前最低实现要求到齐后下发生产', {
+        if (order.status === 'PURCHASING' && purchase.arrivedQty < purchase.item.quantity) {
+          throw errors.invalidState('采购尚未全部到货；请到齐后下发生产', {
             arrived: purchase.arrivedQty,
             purchased: purchase.item.quantity
           });
         }
         const item = getSingleItemOrThrow(db, orderId);
         if (input.orderItemId !== item.id) throw errors.validation('产品明细不属于该订单', [{ path: 'orderItemId', message: '明细不匹配' }]);
-        if (input.quantity !== item.quantity) {
-          throw errors.validation('最低实现要求单生产任务覆盖订单全部数量', [
-            { path: 'quantity', message: `应为 ${item.quantity}` }
+        const assigned = getProductions(db, orderId).reduce(
+          (sum, production) => sum + production.quantity,
+          0
+        );
+        const remainingToAssign = item.quantity - assigned;
+        if (remainingToAssign <= 0) {
+          throw errors.conflict('订单数量已全部分配到生产任务，不能继续新增', {
+            ordered: item.quantity,
+            assigned
+          });
+        }
+        if (input.quantity > remainingToAssign) {
+          throw errors.validation('生产任务数量超过订单剩余可分配数量', [
+            { path: 'quantity', message: `最多可分配 ${remainingToAssign} 件` }
           ]);
         }
-        const existing = db.get<{ id: string }>('SELECT id FROM production_orders WHERE order_id = ?', orderId);
-        if (existing) throw errors.conflict('该订单已存在生产任务；当前最低实现只支持单生产任务');
         const department = db.get<{ id: string; name: string; category: string; active: number }>(
           'SELECT id, name, category, active FROM departments WHERE id = ?',
           input.departmentId
@@ -297,6 +310,8 @@ export async function registerProductionRoutes(app: FastifyInstance, ctx: AppCon
        JOIN departments d ON d.id = p.department_id
        LEFT JOIN users u ON u.id = p.assignee_id
        WHERE p.department_id = ? AND o.status = 'IN_PRODUCTION'
+         AND (SELECT COALESCE(SUM(f.quantity), 0) FROM production_feedbacks f
+              WHERE f.production_order_id = p.id) < p.quantity
        ORDER BY p.due_date, p.created_at`,
       actor.departmentId
     );
@@ -319,11 +334,38 @@ export async function registerProductionRoutes(app: FastifyInstance, ctx: AppCon
        JOIN order_items oi ON oi.id = p.order_item_id
        JOIN departments d ON d.id = p.department_id
        LEFT JOIN users u ON u.id = p.assignee_id
-       WHERE p.department_id = ? AND o.status <> 'IN_PRODUCTION'
+       WHERE p.department_id = ?
+         AND (o.status <> 'IN_PRODUCTION'
+              OR (SELECT COALESCE(SUM(f.quantity), 0) FROM production_feedbacks f
+                  WHERE f.production_order_id = p.id) >= p.quantity)
        ORDER BY p.created_at DESC LIMIT 50`,
       actor.departmentId
     );
-    return ok(reply, request, { tasks: rows.map((row) => serializeTask(row, actor)) });
+    return ok(reply, request, {
+      tasks: rows.map((row) => ({
+        ...serializeTask(row, actor),
+        feedbacks: db
+          .all<{
+            id: string;
+            quantity: number;
+            note: string;
+            operator_name: string;
+            created_at: string;
+          }>(
+            `SELECT f.id, f.quantity, f.note, f.created_at, u.display_name AS operator_name
+             FROM production_feedbacks f JOIN users u ON u.id = f.operator_id
+             WHERE f.production_order_id = ? ORDER BY f.created_at DESC`,
+            row.id
+          )
+          .map((feedback) => ({
+            id: feedback.id,
+            quantity: feedback.quantity,
+            note: feedback.note,
+            operatorName: feedback.operator_name,
+            createdAt: feedback.created_at
+          }))
+      }))
+    });
   });
 
   app.post('/production-orders/:id/feedbacks', production, async (request, reply) => {

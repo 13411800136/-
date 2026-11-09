@@ -26,4 +26,7 @@ R24 重试与弱网,已验收,frontend/lib/api.ts; hooks.ts; 各表单,写接口
 R25 可靠性,已验收,db/database.ts; common/idempotency.ts; services,--,全部业务表,tests/integration/inventory.test.ts;atomicity.test.ts,通过,事务/约束/并发/回滚
 R26 环境交付,已验收,config.ts; migrate.ts; seed.ts; scripts/backup|restore,GET /health; GET /ready,--,tests/reports/clean-room-*;backup-run.txt;restore-run.txt,通过,干净安装+恢复新实例
 R27 AI 与文档,已验收,PRD/README/AGENTS/CONSTRAINTS/docs/tasks/tests,--,--,本报告/追溯/功能状态,通过,与当前版本一致
-MSG-01 内部消息,已验收,modules/messages/routes.ts; pages/MessagesPage.tsx,GET/POST /messages; GET /messages/inbox; GET /messages/sent; POST /messages/:id/read,internal_messages;audit_logs,tests/integration/messages.test.ts;tests/evidence/e2e/12-internal-messages.png,37/37 + 浏览器通过,岗位间沟通；关联职责范围订单；未读/已读
+MSG-01 内部消息,已验收,modules/messages/routes.ts; pages/MessagesPage.tsx,GET/POST /messages; GET /messages/inbox; GET /messages/sent; POST /messages/:id/read,internal_messages;audit_logs,tests/integration/messages.test.ts;tests/evidence/e2e/12-internal-messages.png,41/41 + 浏览器通过,岗位间沟通；关联职责范围订单；未读/已读
+X01 多部门生产,已验收,modules/production/routes.ts; OrderDetailPage; ProductionModal,POST /orders/:id/production-orders（多任务）,production_orders;production_feedbacks,tests/integration/order-ops.test.ts;18-multi-department-production.png,41/41 + 浏览器通过,任务合计≤订单量；逐任务反馈/质检
+X02 12h撤销,已验收,modules/orders/routes.ts; CancelOrderModal,POST /orders/:id/cancel,orders.cancelled_at;audit_logs;order_timeline,tests/integration/order-ops.test.ts;16/17 截图,41/41 + 浏览器通过,管理员；待采购；≤12h；记录原因
+X03 批量发货,已验收,modules/orders/routes.ts; OrdersPage,POST /orders/batch/confirm-shipment,orders;order_timeline;audit_logs,tests/integration/order-ops.test.ts;15-batch-shipment.png,41/41 + 浏览器通过,整批校验；任一失败不执行

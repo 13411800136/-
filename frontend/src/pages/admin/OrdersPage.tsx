@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowRight, Download, Filter, Plus, Search, X } from 'lucide-react';
 import { api, errorMessage } from '../../lib/api';
-import { useAsync, useDocumentTitle } from '../../lib/hooks';
+import { useAsync, useDocumentTitle, useIntentKey } from '../../lib/hooks';
 import type { OrderListItem, Pagination } from '../../lib/types';
 import { fmtDate, fmtMoney, STATUS_TONE, dueLabel } from '../../lib/format';
 import {
@@ -26,7 +26,8 @@ const STATUS_OPTIONS = [
   ['QC_DONE', '质检已放行'],
   ['PACKING', '包装中'],
   ['SHIPPING', '待发货'],
-  ['COMPLETED', '已完成']
+  ['COMPLETED', '已完成'],
+  ['CANCELLED', '已撤销']
 ] as const;
 
 interface OrderListResponse {
@@ -44,6 +45,13 @@ export function OrdersPage() {
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
   const [exporting, setExporting] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batching, setBatching] = useState(false);
+  const { key: batchKey, renew: renewBatchKey } = useIntentKey('batch-ship-');
+
+  useEffect(() => {
+    setSelected([]);
+  }, [page, status, keyword]);
 
   useEffect(() => {
     const next = params.get('status') ?? '';
@@ -100,6 +108,45 @@ export function OrdersPage() {
   const items = data?.items ?? [];
   const pagination = data?.pagination;
   const hasFilter = Boolean(status || keyword);
+  const selectableItems = items.filter((order) => order.status === 'PACKING');
+  const selectedSet = new Set(selected);
+
+  const toggleSelected = (orderId: string) => {
+    setSelected((current) =>
+      current.includes(orderId) ? current.filter((id) => id !== orderId) : [...current, orderId]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectableItems.every((order) => selectedSet.has(order.id))) {
+      setSelected((current) => current.filter((id) => !selectableItems.some((order) => order.id === id)));
+    } else {
+      setSelected((current) => [
+        ...current,
+        ...selectableItems.map((order) => order.id).filter((id) => !current.includes(id))
+      ]);
+    }
+  };
+
+  const batchConfirmShipment = async () => {
+    if (selected.length === 0) return;
+    setBatching(true);
+    try {
+      const result = await api.post<{ count: number; message: string }>(
+        '/orders/batch/confirm-shipment',
+        { orderIds: selected },
+        batchKey
+      );
+      toast.success('批量确认发货成功', result.message);
+      setSelected([]);
+      renewBatchKey();
+      reload();
+    } catch (reason) {
+      toast.error('批量确认发货失败', errorMessage(reason));
+    } finally {
+      setBatching(false);
+    }
+  };
 
   return (
     <div className="stack-lg">
@@ -171,6 +218,20 @@ export function OrdersPage() {
         </span>
       </section>
 
+      {selected.length > 0 ? (
+        <div className="batch-bar">
+          <span>
+            已选择 <strong>{selected.length}</strong> 张包装中的订单
+          </span>
+          <Button size="sm" variant="dark" loading={batching} onClick={() => void batchConfirmShipment()}>
+            批量确认发货
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+            清空选择
+          </Button>
+        </div>
+      ) : null}
+
       {loading && !data ? (
         <LoadingState rows={6} />
       ) : error && !data ? (
@@ -197,6 +258,15 @@ export function OrdersPage() {
             <table className="data-table order-table">
               <thead>
                 <tr>
+                  <th className="check-col">
+                    <input
+                      type="checkbox"
+                      aria-label="全选可批量确认发货的订单"
+                      checked={selectableItems.length > 0 && selectableItems.every((order) => selectedSet.has(order.id))}
+                      onChange={toggleAll}
+                      disabled={selectableItems.length === 0}
+                    />
+                  </th>
                   <th>订单号</th>
                   <th>客户 / 产品</th>
                   <th className="num">数量</th>
@@ -212,6 +282,15 @@ export function OrdersPage() {
                   const due = dueLabel(order.dueDate);
                   return (
                     <tr key={order.id} className="row-clickable" onClick={() => navigate(`/admin/orders/${order.id}`)}>
+                      <td className="check-cell" onClick={(event) => event.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          aria-label={`选择订单 ${order.orderNo}`}
+                          checked={selectedSet.has(order.id)}
+                          disabled={order.status !== 'PACKING'}
+                          onChange={() => toggleSelected(order.id)}
+                        />
+                      </td>
                       <td>
                         <span className="mono order-no">{order.orderNo}</span>
                         {order.note ? <span className="cell-sub truncate">{order.note}</span> : null}

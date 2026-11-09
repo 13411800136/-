@@ -73,7 +73,8 @@ export const STATUS_TONE: Record<OrderStatus, string> = {
   QC_DONE: 'blue',
   PACKING: 'orange',
   SHIPPING: 'cyan',
-  COMPLETED: 'green'
+  COMPLETED: 'green',
+  CANCELLED: 'slate'
 };
 
 export function dueLabel(date: string): { text: string; tone: 'normal' | 'warn' | 'danger' } {

@@ -192,8 +192,8 @@ export function AttachmentPanel({
       setError('只允许上传 PDF 文件');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('文件不能超过 5 MB');
+    if (file.size > 20 * 1024 * 1024) {
+      setError('文件不能超过 20 MB');
       return;
     }
     setUploading(true);
@@ -229,7 +229,7 @@ export function AttachmentPanel({
     <div className="attachment-panel">
       <SectionTitle
         title="订单附件"
-        hint="仅 PDF · 最大 5 MB"
+        hint="仅 PDF · 最大 20 MB"
         action={
           <Button size="sm" variant="secondary" icon={<Upload size={14} />} loading={uploading} onClick={pick}>
             上传

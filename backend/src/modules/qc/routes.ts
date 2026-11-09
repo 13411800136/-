@@ -14,7 +14,8 @@ import {
   assertOrderStatus,
   getOrderOrThrow,
   getProductions,
-  getQcRecords
+  getQcRecords,
+  getSingleItemOrThrow
 } from '../orders/service.js';
 
 const qcRecordSchema = z.object({
@@ -61,6 +62,14 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
         assertOrderStatus(order, ['IN_PRODUCTION'], '只有生产中的订单可以下发质检');
         const productions = getProductions(db, orderId);
         if (productions.length === 0) throw errors.invalidState('订单没有生产任务，不能下发质检');
+        const item = getSingleItemOrThrow(db, orderId);
+        const assigned = productions.reduce((sum, task) => sum + task.quantity, 0);
+        if (assigned < item.quantity) {
+          throw errors.invalidState('生产任务总量尚未覆盖订单应交数量，不能下发质检', {
+            ordered: item.quantity,
+            assigned
+          });
+        }
         const incomplete = productions.filter((task) => task.producedQty < task.quantity);
         if (incomplete.length > 0) {
           throw errors.invalidState('生产任务尚未全部完成，不能下发质检', {
@@ -311,7 +320,7 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
         return ok(reply, request, {
           id: qcId,
           decision: 'PASS',
-          orderStatus: 'QC_DONE',
+          orderStatus: qc.order_status,
           releasedQty: qc.qualified_qty,
           replayed: true
         });
@@ -333,7 +342,14 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
           qcId
         );
         if (Number(updated.changes) !== 1) throw errors.conflict('质检记录已被其他请求处置');
-        db.run('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', 'QC_DONE', now, qc.order_id);
+        const allRecords = getQcRecords(db, qc.order_id);
+        const taskCount = getProductions(db, qc.order_id).length;
+        const allPassed =
+          taskCount > 0 &&
+          allRecords.length === taskCount &&
+          allRecords.every((record) => record.decision === 'PASS');
+        const nextStatus = allPassed ? 'QC_DONE' : 'PENDING_QC';
+        db.run('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', nextStatus, now, qc.order_id);
         addTimeline(db, {
           orderId: qc.order_id,
           eventType: 'QC_PASSED',
@@ -354,7 +370,14 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
           after: { decision: 'PASS', released: qc.qualified_qty }
         });
         return {
-          data: { id: qcId, decision: 'PASS', orderStatus: 'QC_DONE', releasedQty: qc.qualified_qty },
+          data: {
+            id: qcId,
+            decision: 'PASS',
+            orderStatus: nextStatus,
+            releasedQty: allRecords
+              .filter((record) => record.decision === 'PASS')
+              .reduce((sum, record) => sum + record.qualified_qty, 0)
+          },
           businessId: qcId
         };
       }
