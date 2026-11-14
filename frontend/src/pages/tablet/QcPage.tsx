@@ -32,7 +32,7 @@ export function QcPage() {
       <PageHeader
         eyebrow="QUALITY CONTROL"
         title="质检队列"
-        description="录入检验结果不等于放行。最低实现为一次全合格质检，管理员 PASS 后才进入包装。"
+        description="录入检验结果不等于放行。有不合格品时如实上报，由管理员决定返工或报废；补产复检通过后才进入包装。"
         actions={
           <Button variant="secondary" size="sm" icon={<RefreshCw size={15} />} onClick={refreshAll}>
             刷新队列
@@ -49,7 +49,7 @@ export function QcPage() {
         <div>
           <ClipboardCheck size={18} />
           <span>录入规则</span>
-          <strong className="small">全检 · 全合格</strong>
+          <strong className="small">全检 · 可上报不合格</strong>
         </div>
         <div>
           <CheckCircle2 size={18} />

@@ -1126,6 +1126,34 @@ th.num {
   margin-left: 8px;
 }
 
+/* 处置选项：选中用墨色描边 + 纸面，避免与整站色板冲突 */
+.decision-option {
+  border-radius: 2px;
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.decision-option:hover:not(:disabled) {
+  border-color: var(--line-strong);
+}
+
+.decision-option-active {
+  border-color: var(--ink);
+  background: var(--card-2);
+  box-shadow: inset 3px 0 0 var(--signal);
+}
+
+.decision-option-active svg {
+  color: var(--ink);
+}
+
+.decision-option-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ---------- 11. 弹窗与提示 ---------- */
 
 .modal {
