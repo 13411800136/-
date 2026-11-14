@@ -12,6 +12,8 @@ export type TimelineEventType =
   | 'QC_DISPATCHED'
   | 'QC_RECORDED'
   | 'QC_PASSED'
+  | 'QC_REWORKED'
+  | 'QC_SCRAPPED'
   | 'PACKING_DISPATCHED'
   | 'PACKING_RECORDED'
   | 'SHIPMENT_TRIGGERED'

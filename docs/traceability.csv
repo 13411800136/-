@@ -1,19 +1,19 @@
 requirement,m_status,implementation,api,tables,tests,result,notes
-R01 身份与会话,已验收,modules/auth/routes.ts; common/auth.ts; common/crypto.ts,POST /auth/login; GET /auth/me; POST /auth/logout,users;sessions;audit_logs,tests/integration/auth.test.ts;master-session.test.ts;tests/e2e/full-flow.spec.ts,33/33 + 2/2 通过,真实会话与角色；停用撤销旧会话
+R01 身份与会话,已验收,modules/auth/routes.ts; common/auth.ts; common/crypto.ts,POST /auth/login; GET /auth/me; POST /auth/logout,users;sessions;audit_logs,tests/integration/auth.test.ts;master-session.test.ts;tests/e2e/full-flow.spec.ts,49/49 + 2/2 通过,真实会话与角色；停用撤销旧会话
 R02 基础数据,已验收,modules/master/routes.ts,GET/POST/PATCH /customers /suppliers /parts /departments /users,users;departments;customers;suppliers;parts,tests/integration/master-session.test.ts,通过,编码唯一；停用不删历史
-R03 业务订单,已验收,modules/orders/routes.ts; orders/service.ts,GET/POST /orders; GET /orders/:id,orders;order_items;order_timeline;audit_logs,tests/integration/order-flow.test.ts;tests/e2e/full-flow.spec.ts,通过,单产品；唯一订单号；无编辑取消
+R03 业务订单,已验收,modules/orders/routes.ts; orders/service.ts; modules/master/auto-create.ts,GET/POST /orders; GET /orders/:id,orders;order_items;order_timeline;audit_logs,tests/integration/order-flow.test.ts;inline-master-qc-finance.test.ts;tests/e2e/full-flow.spec.ts,通过,单产品；输入新客户/新配件自动建档；无编辑取消
 R04 采购,已验收,modules/purchases/routes.ts,POST /orders/:id/purchase-orders,purchase_orders;purchase_items,tests/integration/order-flow.test.ts,通过,一单一采购单；价格快照
 R05 到货,已验收,modules/purchases/routes.ts,POST /purchase-items/:id/arrivals,arrival_records;order_timeline;notifications,tests/integration/order-flow.test.ts,通过,累计≤采购量；幂等
 R06 电镀,不适用,orders/service.ts 阶段投影,无,无,tests/integration/order-flow.test.ts,PLATING:NOT_APPLICABLE,范围表 M 不启用
 R07 生产,已验收,modules/production/routes.ts,POST /orders/:id/production-orders; POST /production-orders/:id/feedbacks,production_orders;production_feedbacks,tests/integration/order-flow.test.ts;order-ops.test.ts,通过,多任务/多部门并行；任务合计≤订单量
 R08 单价开关,已验收,modules/production/routes.ts,PATCH /production-orders/:id/price-visibility,production_orders,tests/integration/order-flow.test.ts,通过,现场按开关裁剪
-R09 质检,已验收,modules/qc/routes.ts,POST /orders/:id/dispatch-qc; POST /production-orders/:id/qc-records; POST /qc-records/:id/decision,qc_records;production_orders,tests/integration/order-flow.test.ts,通过,一次全检全合格；录入/放行分离
+R09 质检,已验收,modules/qc/routes.ts,POST /orders/:id/dispatch-qc; POST /production-orders/:id/qc-records; POST /qc-records/:id/decision,qc_records;production_orders,tests/integration/order-flow.test.ts;inline-master-qc-finance.test.ts,通过,全检；不合格必须处置；返工/报废退回补产复检
 R10 包装,已验收,modules/packing/routes.ts,POST /orders/:id/dispatch-packing; POST /orders/:id/packing-records,packing_records,tests/integration/order-flow.test.ts,通过,≤放行/应交
 R11 发货,已验收,modules/shipping/routes.ts,POST /orders/:id/trigger-shipment; POST /orders/:id/shipments,shipment_records;orders,tests/integration/order-flow.test.ts,通过,≤可发/应交；足量完成
 R12 撤销修正,已实现（M 边界）,modules/cancellations/routes.ts,POST /{resource}/:id/cancel; DELETE /{resource}/:id,无,auth.test.ts,409 FEATURE_NOT_ENABLED,不删除记录；F 撤销未选做
 R13 配件库存,已验收,modules/inventory/routes.ts,POST /inventory/parts/adjust; GET /inventory/parts/:id/logs,part_inventory;inventory_logs,tests/integration/inventory.test.ts,通过,非负；幂等；条件更新
 R14 成品库存,已验收,modules/inventory/routes.ts,POST /inventory/products/adjust; GET /inventory/products/:id/logs,product_inventory;inventory_logs,tests/integration/inventory.test.ts,通过,唯一身份；首建并发
-R15 利润,已验收,common/money.ts; orders/service.ts,GET /orders/:id/profit; GET /orders/:id,orders;order_items;purchase_items;production_feedbacks,tests/unit/money.test.ts;order-flow.test.ts,878.00 / 70.24%,整数分；预计利润
+R15 利润,已验收,common/money.ts; orders/service.ts; modules/finance/routes.ts,GET /orders/:id/profit; GET /orders/:id; GET /finance/summary,orders;order_items;purchase_items;production_feedbacks,tests/unit/money.test.ts;order-flow.test.ts;inline-master-qc-finance.test.ts,878.00 / 70.24%,整数分；预计利润；订单流水实时汇总
 R16 时间线与状态,已验收,common/events.ts; orders/service.ts,GET /orders/:id/timeline; GET /orders/:id/operation-summary,order_timeline;orders,tests/integration/order-flow.test.ts;tests/e2e/full-flow.spec.ts,13 事件/9 阶段,直接 PATCH 409
 R17 附件,已验收,modules/attachments/routes.ts,POST /orders/:id/attachments; GET /attachments/:id/download,attachments,tests/integration/export-attachment.test.ts;f-extensions.test.ts,通过,PDF/PNG/JPG≤20MB；扩展名/MIME/魔数一致；鉴权
 R18 导入,不适用,无（基础数据页面维护）,无,无,--,不适用,范围表 M 允许不提供
@@ -30,3 +30,7 @@ MSG-01 内部消息,已验收,modules/messages/routes.ts; pages/MessagesPage.tsx
 X01 多部门生产,已验收,modules/production/routes.ts; OrderDetailPage; ProductionModal,POST /orders/:id/production-orders（多任务）,production_orders;production_feedbacks,tests/integration/order-ops.test.ts;18-multi-department-production.png,41/41 + 浏览器通过,任务合计≤订单量；逐任务反馈/质检
 X02 12h撤销,已验收,modules/orders/routes.ts; CancelOrderModal,POST /orders/:id/cancel,orders.cancelled_at;audit_logs;order_timeline,tests/integration/order-ops.test.ts;16/17 截图,41/41 + 浏览器通过,管理员；待采购；≤12h；记录原因
 X03 批量发货,已验收,modules/orders/routes.ts; OrdersPage,POST /orders/batch/confirm-shipment,orders;order_timeline;audit_logs,tests/integration/order-ops.test.ts;15-batch-shipment.png,41/41 + 浏览器通过,整批校验；任一失败不执行
+
+v1.4-1 现场建档,已验收,modules/master/auto-create.ts,POST /orders; POST /orders/:id/purchase-orders,customers;suppliers;parts,tests/integration/inline-master-qc-finance.test.ts,通过,同名不重复建档；编码自动生成；停用客户拒绝
+v1.4-2 质检不合格处置,已验收,modules/qc/routes.ts; production/routes.ts,POST /qc-records/:id/decision,qc_records;production_orders,tests/integration/order-flow.test.ts;inline-master-qc-finance.test.ts,通过,不合格不能 PASS；返工/报废退回；补产容量=订单量+不合格量
+v1.4-3 订单流水,已验收,modules/finance/routes.ts; FinancePage.tsx,GET /finance/summary,orders;order_items;purchase_items;production_feedbacks,tests/integration/inline-master-qc-finance.test.ts;tests/evidence/e2e/26-finance-flow.png,通过,实时汇总；撤销单不计入；仅管理员

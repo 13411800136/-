@@ -5,6 +5,7 @@ import { AppShell } from './app/AppShell';
 import { ToastProvider } from './components/Toast';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/admin/DashboardPage';
+import { FinancePage } from './pages/admin/FinancePage';
 import { OrdersPage } from './pages/admin/OrdersPage';
 import { NewOrderPage } from './pages/admin/NewOrderPage';
 import { OrderDetailPage } from './pages/admin/OrderDetailPage';
@@ -93,6 +94,14 @@ export function App() {
                 element={
                   <ProtectedRoute roles={['ADMIN']}>
                     <InventoryPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/finance"
+                element={
+                  <ProtectedRoute roles={['ADMIN']}>
+                    <FinancePage />
                   </ProtectedRoute>
                 }
               />

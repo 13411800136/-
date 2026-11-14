@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { CheckCircle2, Factory, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Factory, RotateCw, ShieldCheck, Trash2 } from 'lucide-react';
 import { api, errorMessage, isUnknownResult } from '../../../lib/api';
 import { fmtDateTime, fmtMoney, today } from '../../../lib/format';
 import { useIntentKey } from '../../../lib/hooks';
@@ -100,7 +100,10 @@ export function PurchaseModal({
 }) {
   const { key } = useIntentKey('purchase-');
   const [supplierId, setSupplierId] = useState(suppliers.find((supplier) => supplier.active)?.id ?? '');
+  const [supplierName, setSupplierName] = useState('');
   const [partId, setPartId] = useState(parts.find((part) => part.active)?.partId ?? '');
+  const [partName, setPartName] = useState('');
+  const [partSpec, setPartSpec] = useState('');
   const [quantity, setQuantity] = useState(String(item.quantity));
   const [unitPrice, setUnitPrice] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -112,15 +115,26 @@ export function PurchaseModal({
   }, [quantity, unitPrice]);
 
   const submit = () => {
-    if (!supplierId) return setFieldError('请选择供应商');
-    if (!partId) return setFieldError('请选择采购配件');
+    if (!supplierId && !supplierName.trim()) return setFieldError('请选择供应商，或填写新供应商名称');
+    if (!partId && !partName.trim()) return setFieldError('请选择采购配件，或填写新采购配件名称');
     if (!/^\d+$/.test(quantity) || Number(quantity) <= 0) return setFieldError('采购数量必须是正整数');
     if (!/^\d+(\.\d{1,2})?$/.test(unitPrice)) return setFieldError('采购单价格式不合法');
     void action.run(
       () =>
         api.post(
           `/orders/${orderId}/purchase-orders`,
-          { supplierId, item: { partId, quantity: Number(quantity), unitPrice } },
+          {
+            ...(supplierId && supplierId !== '__new__'
+              ? { supplierId }
+              : { supplierName: supplierName.trim() }),
+            item: {
+              ...(partId && partId !== '__new__'
+                ? { partId }
+                : { partName: partName.trim(), spec: partSpec.trim() }),
+              quantity: Number(quantity),
+              unitPrice
+            }
+          },
           key
         ),
       '采购单已建立',
@@ -161,7 +175,19 @@ export function PurchaseModal({
                     {supplier.name}
                   </option>
                 ))}
+              <option value="__new__">＋ 新供应商（手动输入名称）</option>
             </Select>
+            {supplierId === '__new__' ? (
+              <div className="inline-create">
+                <TextInput
+                  value={supplierName}
+                  onChange={(event) => setSupplierName(event.target.value)}
+                  placeholder="输入新供应商名称"
+                  maxLength={80}
+                />
+                <small>保存后自动建档，编码自动生成。</small>
+              </div>
+            ) : null}
           </Field>
           <Field label="采购配件" required>
             <Select value={partId} onChange={(event) => setPartId(event.target.value)}>
@@ -174,7 +200,25 @@ export function PurchaseModal({
                     {part.spec ? ` / ${part.spec}` : ''}
                   </option>
                 ))}
+              <option value="__new__">＋ 新采购配件（手动输入名称）</option>
             </Select>
+            {partId === '__new__' ? (
+              <div className="inline-create">
+                <TextInput
+                  value={partName}
+                  onChange={(event) => setPartName(event.target.value)}
+                  placeholder="输入新采购配件名称"
+                  maxLength={80}
+                />
+                <TextInput
+                  value={partSpec}
+                  onChange={(event) => setPartSpec(event.target.value)}
+                  placeholder="规格（可选）"
+                  maxLength={120}
+                />
+                <small>保存后自动建档，采购单据保存名称与规格快照。</small>
+              </div>
+            ) : null}
           </Field>
           <Field label="采购数量" required hint={`订单应交 ${item.quantity} 件；采购量按本单物料计划填写`}>
             <TextInput value={quantity} inputMode="numeric" onChange={(event) => setQuantity(event.target.value)} />
@@ -477,14 +521,18 @@ export function QcDecisionModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [note, setNote] = useState('');
+  const hasDefect = qc.unqualifiedQty > 0;
+  const [decision, setDecision] = useState<'PASS' | 'REWORK' | 'SCRAP'>(hasDefect ? 'REWORK' : 'PASS');
+  const [note, setNote] = useState(hasDefect ? '退回返工，补产后再送检' : '');
   const { key } = useIntentKey('qc-decision-');
   const action = useActionState(onDone);
   const submit = () =>
     void action.run(
-      () => api.post(`/qc-records/${qc.id}/decision`, { decision: 'PASS', note }, key),
-      '质检已放行',
-      `放行 ${qc.qualifiedQty} 件，可进入包装`
+      () => api.post(`/qc-records/${qc.id}/decision`, { decision, note: note.trim() }, key),
+      decision === 'PASS' ? '质检已放行' : decision === 'REWORK' ? '已退回返工' : '已登记报废',
+      decision === 'PASS'
+        ? `放行 ${qc.qualifiedQty} 件，可进入包装`
+        : '订单已退回生产，请补产不合格数量并重新送检'
     );
 
   return (
@@ -492,15 +540,20 @@ export function QcDecisionModal({
       open
       onClose={onClose}
       title="处置质检结果"
-      subtitle="品控只录入结果，管理员确认放行后包装才可读取数量。"
+      subtitle="品控只录入结果；不合格品必须由管理员决定返工或报废，不能直接放行。"
       size="md"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
           </Button>
-          <Button loading={action.submitting} onClick={submit} icon={<CheckCircle2 size={16} />}>
-            确认 PASS 放行
+          <Button
+            loading={action.submitting}
+            onClick={submit}
+            variant={decision === 'PASS' ? 'primary' : 'danger'}
+            icon={decision === 'PASS' ? <CheckCircle2 size={16} /> : <RotateCw size={16} />}
+          >
+            {decision === 'PASS' ? '确认 PASS 放行' : decision === 'REWORK' ? '确认退回返工' : '确认报废'}
           </Button>
         </>
       }
@@ -519,30 +572,66 @@ export function QcDecisionModal({
           </div>
           <div>
             <span>不合格量</span>
-            <strong>{qc.unqualifiedQty}</strong>
+            <strong className={hasDefect ? 'negative' : ''}>{qc.unqualifiedQty}</strong>
           </div>
           <div>
             <span>录入人</span>
             <strong className="small">{qc.inspectorName}</strong>
           </div>
         </div>
-        <div className="decision-options">
-          <div className="decision-option decision-option-active">
-            <CheckCircle2 size={18} />
-            <div>
-              <strong>PASS · 全额放行</strong>
-              <span>当前最低实现唯一启用选项</span>
-            </div>
+
+        {hasDefect ? (
+          <Alert tone="warning" title="本次存在不合格品">
+            {qc.unqualifiedQty} 件不合格，不能直接放行。选择返工或报废后，订单退回生产；补产后重新送检，合格量累计覆盖应交量才算质检完成。
+          </Alert>
+        ) : (
+          <Alert tone="info" title="全检合格">
+            确认后放行 {qc.qualifiedQty} 件进入包装。
+          </Alert>
+        )}
+
+        <Field label="处置方式" hint={hasDefect ? '不合格品必须二选一' : '没有不合格品，只能放行'}>
+          <div className="decision-options">
+            <button
+              type="button"
+              className={`decision-option ${decision === 'PASS' ? 'decision-option-active' : ''} ${hasDefect ? 'decision-option-disabled' : ''}`}
+              disabled={hasDefect}
+              onClick={() => setDecision('PASS')}
+            >
+              <CheckCircle2 size={18} />
+              <div>
+                <strong>PASS · 放行合格品</strong>
+                <span>{hasDefect ? '存在不合格品时不可选' : `放行 ${qc.qualifiedQty} 件，进入包装`}</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              className={`decision-option ${decision === 'REWORK' ? 'decision-option-active' : ''} ${hasDefect ? '' : 'decision-option-disabled'}`}
+              disabled={!hasDefect}
+              onClick={() => setDecision('REWORK')}
+            >
+              <RotateCw size={18} />
+              <div>
+                <strong>REWORK · 退回返工</strong>
+                <span>不合格 {qc.unqualifiedQty} 件补产后重新送检</span>
+              </div>
+            </button>
+            <button
+              type="button"
+              className={`decision-option ${decision === 'SCRAP' ? 'decision-option-active' : ''} ${hasDefect ? '' : 'decision-option-disabled'}`}
+              disabled={!hasDefect}
+              onClick={() => setDecision('SCRAP')}
+            >
+              <Trash2 size={18} />
+              <div>
+                <strong>SCRAP · 确认报废</strong>
+                <span>不合格 {qc.unqualifiedQty} 件作废，需要重新补产</span>
+              </div>
+            </button>
           </div>
-          <div className="decision-option decision-option-disabled">
-            <ShieldCheck size={18} />
-            <div>
-              <strong>REWORK / SCRAP</strong>
-              <span>F 能力未启用，不能提交</span>
-            </div>
-          </div>
-        </div>
-        <Field label="处置备注（可选）">
+        </Field>
+
+        <Field label="处置备注" hint="会写入订单时间线与审计日志">
           <TextArea rows={2} value={note} onChange={(event) => setNote(event.target.value)} maxLength={200} />
         </Field>
       </div>

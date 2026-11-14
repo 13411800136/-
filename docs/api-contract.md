@@ -1,6 +1,6 @@
 # API 合同：厂序 FactoryFlow
 
-版本：v1.3.1（2026-11-09）
+版本：v1.4.0（2026-11-14）
 前缀：`/api/v1`；Content-Type：`application/json`（附件上传为 multipart，导出为 xlsx）。
 成功：`{ "data": ..., "requestId": "..." }`；失败：`{ "error": { "code": "...", "message": "...", "details": ... }, "requestId": "..." }`。
 
@@ -49,7 +49,7 @@
 | 方法/路径 | 角色 | 说明 | 幂等 |
 | --- | --- | --- | --- |
 | `GET /orders` | ADMIN | 列表；`status`、`keyword`、分页 | — |
-| `POST /orders` | ADMIN | 建单（单明细）；订单号后端生成 | 必需 |
+| `POST /orders` | ADMIN | 建单（单明细）；`customerId` 或 `customerName`、`item.partId` 或 `item.partName` 二选一；订单号后端生成 | 必需 |
 | `GET /orders/:id` | ADMIN | 详情 + summary + profit + stages | — |
 | `GET /orders/:id/timeline` | ADMIN | 时间线事件 | — |
 | `GET /orders/:id/profit` | ADMIN | 利润 | — |
@@ -62,7 +62,7 @@
 
 | 方法/路径 | 角色 | 说明 | 幂等 |
 | --- | --- | --- | --- |
-| `POST /orders/:id/purchase-orders` | ADMIN | 一单一采购单、单配件 | 必需 |
+| `POST /orders/:id/purchase-orders` | ADMIN | 一单一采购单、单配件；`supplierId`/`supplierName`、`item.partId`/`item.partName` 二选一 | 必需 |
 | `GET /purchase-orders/:id` | ADMIN | 采购单 + 明细 + 到货 | — |
 | `GET /orders/:id/arrivals` | ADMIN | 该订单到货汇总 | — |
 | `POST /purchase-items/:id/arrivals` | LOGISTICS | 登记本次到货；累计≤采购量 | 必需 |
@@ -83,10 +83,10 @@
 
 | 方法/路径 | 角色 | 说明 | 幂等 |
 | --- | --- | --- | --- |
-| `POST /orders/:id/dispatch-qc` | ADMIN | 生产全部完成后下发质检 | 必需 |
+| `POST /orders/:id/dispatch-qc` | ADMIN | 生产全部完成后下发质检；返工补产后可复检 | 必需 |
 | `GET /tablet/qc/queue` | QC | 待录入质检任务 | — |
-| `POST /production-orders/:id/qc-records` | QC | 一次全检全合格 | 必需 |
-| `POST /qc-records/:id/decision` | ADMIN | 仅 PASS；REWORK/SCRAP 409 | 必需 |
+| `POST /production-orders/:id/qc-records` | QC | 全检；合格+不合格=检验量；允许上报不合格 | 必需 |
+| `POST /qc-records/:id/decision` | ADMIN | PASS / REWORK / SCRAP；有不合格不能 PASS；返工/报废退回生产 | 必需 |
 | `GET /orders/:id/qc` | ADMIN | 质检记录 | — |
 | `POST /orders/:id/dispatch-packing` | ADMIN | 放行后可下发 | 必需 |
 | `GET /tablet/packing/queue` | PACKING | 可包装任务 | — |
@@ -120,6 +120,13 @@
 | `GET /inventory/products/:id/logs` | ADMIN | `:id` 为成品库存 ID；流水 | — |
 
 ### 2.8 附件、导出、通知、看板、异常、审计、健康
+
+### 订单流水
+
+| 方法 | 路径 | 角色 | 说明 |
+| --- | --- | --- | --- |
+| GET | `/finance/summary` | ADMIN | 实时汇总销售额、采购成本、生产完成成本、利润、毛利率与按订单明细；撤销单列出但不计入合计 |
+
 
 | 方法/路径 | 角色 | 说明 |
 | --- | --- | --- |

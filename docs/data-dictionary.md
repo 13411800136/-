@@ -37,7 +37,7 @@
 | --- | --- | --- | --- |
 | `production_orders` | `id`、`order_id`、`order_item_id`、`department_id`、`assignee_id`、`process_name`、`quantity`、`unit_price_cents`、`price_visible`、`due_date`、`created_by`、`created_at` | FK；数量/价格 CHECK；部门/订单索引 | 部门归属用于现场隔离 |
 | `production_feedbacks` | `id`、`production_order_id`、`quantity`、`operator_id`、`note`、`request_id`、`created_at` | FK；`quantity>0` | 可多次累计，不得超过任务量（服务层） |
-| `qc_records` | `id`、`production_order_id`、`inspected_qty`、`qualified_qty`、`unqualified_qty`、`inspector_id`、`decision`、`decided_by`、`decided_at`、`created_at` | `production_order_id UNIQUE`；`qualified+unqualified=inspected`；`decision CHECK` | 品控录入与管理员决策分离 |
+| `qc_records` | `id`、`production_order_id`、`inspected_qty`、`qualified_qty`、`unqualified_qty`、`inspector_id`、`decision`、`decided_by`、`decided_at`、`created_at` | `production_order_id UNIQUE`；`qualified+unqualified=inspected`；`decision IN ('PASS','REWORK','SCRAP')` | 品控录入与管理员处置分离；返工/报废只作用于不合格部分，已合格数量计入放行 |
 | `packing_records` | `id`、`order_id`、`order_item_id`、`quantity`、`operator_id`、`note`、`request_id`、`created_at` | FK；`quantity>0`；订单/明细索引 | 可包装量 = 已放行 − 已包装 |
 | `shipment_records` | `id`、`order_id`、`order_item_id`、`quantity`、`operator_id`、`carrier`、`tracking_no`、`request_id`、`created_at` | FK；`quantity>0`；订单/明细索引 | 可发货量 = min(已包装−已发, 应交−已发) |
 

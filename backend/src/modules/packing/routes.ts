@@ -37,7 +37,7 @@ interface PackingQueueRow {
 
 function releasedQty(db: AppContext['db'], orderId: string): number {
   return getQcRecords(db, orderId)
-    .filter((record) => record.decision === 'PASS')
+    .filter((record) => record.decision !== null)
     .reduce((sum, record) => sum + record.qualified_qty, 0);
 }
 

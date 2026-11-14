@@ -281,7 +281,15 @@ export function DashboardPage() {
 
         <aside className="dashboard-rail">
           <Card className="profit-card">
-            <SectionTitle title="订单利润口径" hint="预计值，非财务结算" />
+            <SectionTitle
+              title="订单利润口径"
+              hint="预计值，非财务结算"
+              action={
+                <button type="button" className="text-link" onClick={() => navigate('/admin/finance')}>
+                  查看订单流水 <ArrowRight size={14} />
+                </button>
+              }
+            />
             <div className="profit-hero">
               <span>预计利润</span>
               <strong>{fmtMoney(data.profit.profit)}</strong>

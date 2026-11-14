@@ -28,6 +28,8 @@ interface Customer {
 
 interface OrderForm {
   customerId: string;
+  customerName: string;
+  newPart: string;
   partId: string;
   productName: string;
   spec: string;
@@ -39,6 +41,8 @@ interface OrderForm {
 
 const EMPTY: OrderForm = {
   customerId: '',
+  customerName: '',
+  newPart: '',
   partId: '',
   productName: '',
   spec: '',
@@ -89,7 +93,11 @@ export function NewOrderPage() {
 
   const validate = (): boolean => {
     const next: Record<string, string> = {};
-    if (!form.customerId) next.customerId = '请选择客户';
+    if (form.customerId === '__new__') {
+      if (!form.customerName.trim()) next.customerId = '请填写新客户名称';
+    } else if (!form.customerId) {
+      next.customerId = '请选择客户，或填写新客户名称';
+    }
     if (!form.productName.trim()) next.productName = '请填写产品名称';
     if (!/^\d+$/.test(form.quantity) || Number(form.quantity) <= 0) next.quantity = '数量必须是正整数';
     if (!/^\d+(\.\d{1,2})?$/.test(form.unitPrice)) next.unitPrice = '单价格式应为最多两位小数';
@@ -108,11 +116,17 @@ export function NewOrderPage() {
       const result = await api.post<{ id: string; orderNo: string }>(
         '/orders',
         {
-          customerId: form.customerId,
+          ...(form.customerId && form.customerId !== '__new__'
+            ? { customerId: form.customerId }
+            : { customerName: form.customerName.trim() }),
           dueDate: form.dueDate,
           note: form.note.trim(),
           item: {
-            partId: form.partId || undefined,
+            ...(form.partId && form.partId !== '__new__'
+              ? { partId: form.partId }
+              : form.newPart.trim()
+                ? { partName: form.newPart.trim() }
+                : {}),
             productName: form.productName.trim(),
             spec: form.spec.trim(),
             quantity: Number(form.quantity),
@@ -195,7 +209,13 @@ export function NewOrderPage() {
                 <Select
                   id="customer"
                   value={form.customerId}
-                  onChange={(event) => setForm({ ...form, customerId: event.target.value })}
+                  onChange={(event) =>
+                    setForm({
+                      ...form,
+                      customerId: event.target.value,
+                      customerName: event.target.value === '__new__' ? form.customerName : ''
+                    })
+                  }
                 >
                   <option value="">请选择客户</option>
                   {customers.map((customer) => (
@@ -203,7 +223,20 @@ export function NewOrderPage() {
                       {customer.name}
                     </option>
                   ))}
+                  <option value="__new__">＋ 新客户（手动输入名称）</option>
                 </Select>
+                {form.customerId === '__new__' ? (
+                  <div className="inline-create">
+                    <TextInput
+                      value={form.customerName}
+                      onChange={(event) => setForm({ ...form, customerName: event.target.value })}
+                      placeholder="输入新客户名称，保存后自动建档"
+                      maxLength={80}
+                    />
+                    <small>编码自动生成；同一名称不会重复建档。</small>
+                  </div>
+                ) : null}
+                {errors.customerId ? <p className="field-error">{errors.customerId}</p> : null}
               </Field>
               <Field label="交期" htmlFor="dueDate" required error={errors.dueDate} hint="北京时间日期语义">
                 <div className="input-with-icon">
@@ -232,12 +265,17 @@ export function NewOrderPage() {
                     setForm({
                       ...form,
                       partId: event.target.value,
-                      productName: part?.name ?? form.productName,
-                      spec: part?.spec ?? form.spec
+                      newPart: event.target.value === '__new__' ? form.newPart : '',
+                      productName:
+                        event.target.value === '__new__'
+                          ? form.productName
+                          : (part?.name ?? form.productName),
+                      spec: event.target.value === '__new__' ? form.spec : (part?.spec ?? form.spec)
                     });
                   }}
                 >
                   <option value="">不关联配件</option>
+                  <option value="__new__">＋ 新配件（手动输入名称）</option>
                   {parts.map((part) => (
                     <option key={part.partId} value={part.partId}>
                       {part.code} · {part.name}
@@ -245,6 +283,17 @@ export function NewOrderPage() {
                   ))}
                 </Select>
               </Field>
+              {form.partId === '__new__' ? (
+                <Field label="新配件名称" htmlFor="newPart" hint="保存后自动建档，编码自动生成">
+                  <TextInput
+                    id="newPart"
+                    value={form.newPart}
+                    onChange={(event) => setForm({ ...form, newPart: event.target.value })}
+                    placeholder="例如：铝合金外壳"
+                    maxLength={80}
+                  />
+                </Field>
+              ) : null}
               <Field label="产品名称" htmlFor="productName" required error={errors.productName}>
                 <TextInput
                   id="productName"

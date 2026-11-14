@@ -1,6 +1,6 @@
 # 权限与字段可见性
 
-版本：v1.3.1 / 2026-11-09
+版本：v1.4.0 / 2026-11-09
 
 权限由**后端**执行：路由角色守卫 + 服务层对象/部门校验 + 输出字段裁剪 + 文件鉴权。前端 `ProtectedRoute` 与隐藏按钮只是交互辅助，不能作为授权依据。
 
@@ -47,6 +47,7 @@
 | 订单撤销 | 仅 ADMIN；服务端校验 `cancelled_at IS NULL`、`status=PENDING_PURCHASE`、无采购/生产、创建≤12h；原因必填 | `orders/routes.ts` |
 | 批量确认发货 | 仅 ADMIN；逐单校验 PACKING、包装量≥订单量；任一失败整批不执行 | `orders/routes.ts` |
 | 库存导出 | 仅 ADMIN；xlsx 文件 | `exports/routes.ts` |
+| 订单流水 | 仅 ADMIN；只读实时汇总 | `finance/routes.ts` |
 | 附件 | 管理员；订单必须存在；下载按附件 ID + 存储键，不暴露本地路径 | `attachments/routes.ts` |
 | 订单导出 | 管理员；筛选条件由服务端重新执行 | `exports/routes.ts` |
 | 库存 | 管理员；来源订单若提供必须存在 | `inventory/routes.ts` |

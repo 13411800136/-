@@ -1,6 +1,6 @@
 # 状态、数量与金额口径
 
-版本：v1.3.1 / 2026-11-09
+版本：v1.4.0 / 2026-11-09
 关联：[PRD](../PRD-factory.md) · [API 合同](api-contract.md) · [数据字典](data-dictionary.md)
 
 ## 1. 订单主状态
@@ -12,7 +12,8 @@
 | `PENDING_PURCHASE` 待采购 | `CANCELLED`（派生） | 管理员 12h 内撤销 | 无采购单；创建时间≤12h；原因必填；`cancelled_at` 留痕 |
 | `IN_PRODUCTION` 生产中 | `IN_PRODUCTION` | 新增生产任务 | 任务累计分配仍小于订单量；部门有效 |
 | `IN_PRODUCTION` 生产中 | `PENDING_QC` | 下发质检 | 全部任务反馈完成；任务总量覆盖订单量 |
-| `PENDING_QC` 待质检 | `QC_DONE` | 管理员逐任务 PASS | 每个任务已录入；检验量=合格量；全部 PASS |
+| `PENDING_QC` 待质检 | `QC_DONE` | 管理员处置 | 所有记录已处置；合格量累计 ≥ 应交量 |
+| `PENDING_QC` 待质检 | `IN_PRODUCTION` | 处置 REWORK / SCRAP | 记录不合格数 > 0；退回补产 |
 | `QC_DONE` 质检已放行 | `PACKING` | 下发包装 | 放行量 > 已包装量 |
 | `PACKING` 包装中 | `SHIPPING` | 管理员确认发货 | 已包装量 ≥ 订单应交数量 |
 | `SHIPPING` 待发货 | `COMPLETED` | 物流发货 | 本次数量 ≤ min(已包装−已发, 应交−已发)；累计=应交 |
@@ -31,7 +32,7 @@ M 没有 `PARTIAL_ARRIVED`、返工回流、混合批次等 F 状态。状态是
 | 完成量 `produced` | `SUM(production_feedbacks.quantity)` | 累计不得超过任务量 |
 | 检验量 `inspected` | `qc_records.inspected_qty` | M 必须等于 `produced` |
 | 合格量 `qualified` | `qc_records.qualified_qty` | 合格 + 不合格 = 检验量 |
-| 放行量 `released` | `qc_records.qualified_qty`（仅 decision=PASS） | 品控保存不等于放行 |
+| 放行量 `released` | 已处置记录（PASS/REWORK/SCRAP）的 `qualified_qty` 之和 | 判定不合格只作废不合格部分，不吞掉已合格数量 |
 | 已包装 `packed` | `SUM(packing_records.quantity)` | 不得超过 `released` 与 `ordered` |
 | 已发货 `shipped` | `SUM(shipment_records.quantity)` | 不得超过已包装与应交 |
 
@@ -56,8 +57,8 @@ M 没有 `PARTIAL_ARRIVED`、返工回流、混合批次等 F 状态。状态是
 | 下发/新增生产 | ADMIN | 到齐；可多任务，累计≤订单量；部门类别 PRODUCTION；人员同部门 | 任务；IN_PRODUCTION | 409/400 |
 | 生产反馈 | PRODUCTION | 本部门；IN_PRODUCTION；累计+本次≤任务量 | 反馈；通知 | 404/409 |
 | 下发质检 | ADMIN | IN_PRODUCTION；全部任务完成且总量覆盖订单；无 QC | PENDING_QC | 409 |
-| 质检录入 | QC | PENDING_QC；逐任务全检全合格；≤完成量 | QC 记录；通知 | 409 |
-| 质检处置 | ADMIN | QC 已录入未决策；仅 PASS；全部任务 PASS 后才 QC_DONE | QC_DONE；放行量按 PASS 汇总 | 409/`FEATURE_NOT_ENABLED` |
+| 质检录入 | QC | PENDING_QC；逐任务全检；合格+不合格=检验量；≤完成量 | QC 记录；不合格时通知管理员 | 409 |
+| 质检处置 | ADMIN | QC 未决策；PASS 仅限无不合格；REWORK/SCRAP 需有不合格 | PASS→QC_DONE；REWORK/SCRAP→IN_PRODUCTION | 409 |
 | 下发包装 | ADMIN | QC_DONE；放行>已包装 | PACKING | 409 |
 | 包装 | PACKING | PACKING；≤可包装 | 包装记录；通知 | 409 |
 | 确认发货 | ADMIN | PACKING；已包装≥应交 | SHIPPING | 409 |

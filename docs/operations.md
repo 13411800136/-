@@ -1,6 +1,6 @@
 # 运行与维护手册
 
-版本：v1.3.1 / 2026-11-09
+版本：v1.4.0 / 2026-11-09
 README 是入口；本文件记录较长的运维细节。
 
 ## 1. 安装与初始化
@@ -122,10 +122,11 @@ npm start
 ## 9. 发布与回退
 
 - 发布：锁定版本 → `npm ci` → `npm run build` → 迁移 → 启动 → 健康/就绪 → 一条新订单闭环。
+- 静态资源：`@fastify/static` 使用 `wildcard: false`，文件路由在启动时注册；替换 `frontend/dist` 后必须重启进程，否则新哈希资源会回落到 `index.html`（浏览器报 MIME 错误）。
 - 代码回退：Git 回退代码；**不**回退 schema/数据。
 - 数据回退：用备份恢复到新目录并核对；确认后再切换 `DATABASE_PATH`/`UPLOAD_DIR`。
 - 迁移兼容：新增迁移应先评估旧代码能否读新结构；不可逆变更需先备份并演练恢复。
-- 当前有三个迁移：`001_init.sql`（初始结构）、`002_internal_messages.sql`（内部消息）、`003_orders_customers_batch.sql`（客户税号/地址、订单撤销字段）；没有远程发布、蓝绿/容器编排。
+- 当前有三个迁移：`001_init.sql`（初始结构）、`002_internal_messages.sql`（内部消息）、`003_orders_customers_batch.sql`（客户税号/地址、订单撤销字段）；没有远程发布、蓝绿/容器编排。v1.4.0 未新增迁移（质检处置复用 001 已定义的 `decision` 取值）。
 
 ## 10. 排错
 

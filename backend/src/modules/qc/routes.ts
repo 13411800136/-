@@ -76,7 +76,17 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
             pending: incomplete.map((task) => ({ id: task.id, produced: task.producedQty, quantity: task.quantity }))
           });
         }
-        if (getQcRecords(db, orderId).length > 0) throw errors.conflict('该订单已下发过质检');
+        const pendingDecision = getQcRecords(db, orderId).filter((record) => record.decision === null);
+        if (pendingDecision.length > 0) {
+          throw errors.conflict('上一轮质检还有未处置记录，请管理员先处置后再下发复检');
+        }
+        const alreadyInspected = new Set(
+          getQcRecords(db, orderId).map((record) => record.production_order_id)
+        );
+        const unInspected = productions.filter((task) => !alreadyInspected.has(task.id));
+        if (unInspected.length === 0) {
+          throw errors.conflict('当前所有生产任务都已录入质检结果，没有可下发复检的任务');
+        }
         db.run('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', 'PENDING_QC', nowIso(), orderId);
         addTimeline(db, {
           orderId,
@@ -84,7 +94,10 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
           actor,
           resourceType: 'ORDER',
           resourceId: orderId,
-          payload: { productionOrderIds: productions.map((task) => task.id) }
+          payload: {
+            productionOrderIds: productions.map((task) => task.id),
+            reinspection: alreadyInspected.size > 0
+          }
         });
         writeAudit(db, {
           requestId: request.id,
@@ -185,13 +198,10 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
     const key = requireIdempotencyKey(request);
     const input = validate(qcRecordSchema, request.body);
     const actor = request.auth!.user;
-    if (input.qualifiedQuantity + input.unqualifiedQuantity !== input.inspectedQuantity) {
+    if (input.inspectedQuantity !== input.qualifiedQuantity + input.unqualifiedQuantity) {
       throw errors.validation('合格量与不合格量之和必须等于检验量', [
         { path: 'qualifiedQuantity', message: '数量不守恒' }
       ]);
-    }
-    if (input.unqualifiedQuantity > 0) {
-      throw errors.feature('当前最低实现仅支持一次全合格质检；部分合格、返工与报废属于 F，未启用');
     }
 
     const result = runIdempotent(
@@ -255,8 +265,14 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
         });
         notifyAdmins(db, {
           eventType: 'QC_RECORDED',
-          title: '品控已录入质检结果',
-          body: `生产任务 ${taskId.slice(0, 8)}：检验 ${input.inspectedQuantity}，合格 ${input.qualifiedQuantity}，等待管理员放行。`,
+          title:
+            input.unqualifiedQuantity > 0
+              ? `品控上报不合格 ${input.unqualifiedQuantity} 件，待处置`
+              : '品控已录入质检结果',
+          body:
+            input.unqualifiedQuantity > 0
+              ? `生产任务 ${taskId.slice(0, 8)}：检验 ${input.inspectedQuantity}，合格 ${input.qualifiedQuantity}，不合格 ${input.unqualifiedQuantity}。请选择返工或报废，不能直接放行。`
+              : `生产任务 ${taskId.slice(0, 8)}：检验 ${input.inspectedQuantity}，合格 ${input.qualifiedQuantity}，等待管理员放行。`,
           resourceType: 'ORDER',
           resourceId: task.order_id,
           dedupeKey: `qc-recorded:${qcId}`
@@ -296,18 +312,17 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
     const key = requireIdempotencyKey(request);
     const input = validate(decisionSchema, request.body);
     const actor = request.auth!.user;
-    if (input.decision !== 'PASS') {
-      throw errors.feature('返工（REWORK）与报废（SCRAP）属于 F，未启用；最低实现只允许 PASS');
-    }
     const qc = db.get<{
       id: string;
       production_order_id: string;
       order_id: string;
       decision: string | null;
       qualified_qty: number;
+      unqualified_qty: number;
       order_status: string;
     }>(
-      `SELECT q.id, q.production_order_id, p.order_id, q.decision, q.qualified_qty, o.status AS order_status
+      `SELECT q.id, q.production_order_id, p.order_id, q.decision, q.qualified_qty, q.unqualified_qty,
+              o.status AS order_status
        FROM qc_records q
        JOIN production_orders p ON p.id = q.production_order_id
        JOIN orders o ON o.id = p.order_id
@@ -316,18 +331,30 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
     );
     if (!qc) throw errors.notFound('质检记录不存在');
     if (qc.decision !== null) {
-      if (qc.decision === 'PASS') {
-        return ok(reply, request, {
-          id: qcId,
-          decision: 'PASS',
-          orderStatus: qc.order_status,
-          releasedQty: qc.qualified_qty,
-          replayed: true
-        });
-      }
-      throw errors.conflict('该质检记录已处置，不能重复决策');
+      const replayReleased = db.get<{ qty: number | null }>(
+        `SELECT COALESCE(SUM(q.qualified_qty), 0) AS qty
+         FROM qc_records q
+         JOIN production_orders p ON p.id = q.production_order_id
+         WHERE p.order_id = ? AND q.decision IS NOT NULL`,
+        qc.order_id
+      );
+      return ok(reply, request, {
+        id: qcId,
+        decision: qc.decision,
+        orderStatus: qc.order_status,
+        releasedQty: replayReleased?.qty ?? qc.qualified_qty,
+        replayed: true
+      });
     }
     if (qc.order_status !== 'PENDING_QC') throw errors.invalidState('订单不在待质检状态');
+    if (input.decision === 'PASS' && qc.unqualified_qty > 0) {
+      throw errors.invalidState('本次检验存在不合格品，不能直接放行；请选择返工或报废', {
+        unqualified: qc.unqualified_qty
+      });
+    }
+    if (input.decision !== 'PASS' && qc.unqualified_qty === 0) {
+      throw errors.invalidState('本次检验没有不合格品，无需返工或报废', { unqualified: 0 });
+    }
 
     const result = runIdempotent(
       db,
@@ -335,30 +362,61 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
       () => {
         const now = nowIso();
         const updated = db.run(
-          `UPDATE qc_records SET decision = 'PASS', decided_by = ?, decided_at = ?
+          `UPDATE qc_records SET decision = ?, decided_by = ?, decided_at = ?
            WHERE id = ? AND decision IS NULL`,
+          input.decision,
           actor.id,
           now,
           qcId
         );
         if (Number(updated.changes) !== 1) throw errors.conflict('质检记录已被其他请求处置');
+
         const allRecords = getQcRecords(db, qc.order_id);
-        const taskCount = getProductions(db, qc.order_id).length;
-        const allPassed =
-          taskCount > 0 &&
-          allRecords.length === taskCount &&
-          allRecords.every((record) => record.decision === 'PASS');
-        const nextStatus = allPassed ? 'QC_DONE' : 'PENDING_QC';
+        const itemQty = getSingleItemOrThrow(db, qc.order_id).quantity;
+        const releasedQty = allRecords
+          .filter((record) => record.decision !== null)
+          .reduce((sum, record) => sum + record.qualified_qty, 0);
+        const noPendingDecision = allRecords.every((record) => record.decision !== null);
+
+        let nextStatus: 'QC_DONE' | 'PENDING_QC' | 'IN_PRODUCTION';
+        if (input.decision === 'PASS') {
+          // 全部记录已处置，且放行量覆盖应交量，才算质检完成；返工/报废记录不再阻塞
+          nextStatus = noPendingDecision && releasedQty >= itemQty ? 'QC_DONE' : 'PENDING_QC';
+        } else {
+          // 返工/报废：退回生产，由管理员补产或返工后再次送检
+          nextStatus = 'IN_PRODUCTION';
+        }
         db.run('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', nextStatus, now, qc.order_id);
         addTimeline(db, {
           orderId: qc.order_id,
-          eventType: 'QC_PASSED',
+          eventType:
+            input.decision === 'PASS'
+              ? 'QC_PASSED'
+              : input.decision === 'REWORK'
+                ? 'QC_REWORKED'
+                : 'QC_SCRAPPED',
           actor,
           resourceType: 'QC_RECORD',
           resourceId: qcId,
-          quantity: qc.qualified_qty,
-          payload: { decision: 'PASS', released: qc.qualified_qty }
+          quantity: input.decision === 'PASS' ? qc.qualified_qty : qc.unqualified_qty,
+          payload: {
+            decision: input.decision,
+            qualified: qc.qualified_qty,
+            unqualified: qc.unqualified_qty,
+            released: releasedQty,
+            note: input.note
+          }
         });
+        if (input.decision !== 'PASS') {
+          notifyAdmins(db, {
+            eventType: 'QC_DISPOSED',
+            title: input.decision === 'REWORK' ? '质检不合格已退回返工' : '质检不合格已登记报废',
+            body: `订单 ${qc.order_id.slice(0, 8)}：不合格 ${qc.unqualified_qty} 件，订单退回生产，需补产后再送检。`,
+            resourceType: 'ORDER',
+            resourceId: qc.order_id,
+            dedupeKey: `qc-disposed:${qcId}`
+          });
+        }
         writeAudit(db, {
           requestId: request.id,
           actor,
@@ -367,16 +425,21 @@ export async function registerQcRoutes(app: FastifyInstance, ctx: AppContext): P
           resourceId: qcId,
           result: 'SUCCESS',
           before: { decision: null },
-          after: { decision: 'PASS', released: qc.qualified_qty }
+          after: {
+            decision: input.decision,
+            qualified: qc.qualified_qty,
+            unqualified: qc.unqualified_qty,
+            released: releasedQty,
+            orderStatus: nextStatus
+          }
         });
         return {
           data: {
             id: qcId,
-            decision: 'PASS',
+            decision: input.decision,
             orderStatus: nextStatus,
-            releasedQty: allRecords
-              .filter((record) => record.decision === 'PASS')
-              .reduce((sum, record) => sum + record.qualified_qty, 0)
+            releasedQty,
+            unqualifiedQty: qc.unqualified_qty
           },
           businessId: qcId
         };

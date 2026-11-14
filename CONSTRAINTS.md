@@ -1,7 +1,7 @@
 # 质量约束：厂序 FactoryFlow
 
 版本/日期/维护者：v1.0 / 2026-11-03 / 李嘉磊。
-适用范围与基线：第三轮考核 M 最低实现 + 已申报 F 切片 + v1.2 用户追加增强；基线为当前仓库 `v1.3.1`。
+适用范围与基线：第三轮考核 M 最低实现 + 已申报 F 切片 + v1.2 用户追加增强；基线为当前仓库 `v1.4.0`。
 
 | 维度 | 本项目不可降低的规则 | 具体执行位置/验证方法 | 证据位置 |
 | --- | --- | --- | --- |
@@ -12,7 +12,7 @@
 | 幂等与并发 | 写意图绑定 actor+operation+key+请求摘要；同键同体返回原结果；库存条件更新不丢更新 | `common/idempotency.ts`；库存 `UPDATE ... WHERE quantity + ? >= 0`；唯一约束 | A19/A20 测试；两连接并发最终 3 |
 | 金额与日期 | 整数分计算；两位小数；毛利率约定；北京时间自然日；日期不跨 UTC 偏移 | `common/money.ts`、`common/time.ts`、前端 `format.ts` | 单测 A22；`70.24%` 页面/测试 |
 | 失败与可观测性 | 真实错误码/中文提示；未知结果不报成功；事务回滚；审计脱敏；requestId | `app.ts` 错误处理、`common/audit.ts`、`runIdempotent` | A30/A31 测试；日志/审计截图 |
-| 测试与证据 | 不删跳测试、不降低断言、不伪造通过；失败保留并复测 | `backend/tests/**`、`tests/e2e/**`、`tests/reports/**` | 44/44 单测集成、2/2 E2E |
+| 测试与证据 | 不删跳测试、不降低断言、不伪造通过；失败保留并复测 | `backend/tests/**`、`tests/e2e/**`、`tests/reports/**` | 49/49 单测集成、2/2 E2E |
 | 配置与隐私 | 秘密/运行库/浏览器会话不入包；测试库隔离；生产禁用演示模式 | `.env.example`、`.gitignore`、`loadConfig` 生产校验 | `.gitignore`、README、测试临时目录 |
 | 可复现交付 | 锁文件、迁移、合成种子、配置模板、实测 README、干净启动 | `package-lock.json`、`backend/migrations/`、`seed.ts`、README | 构建/启动/恢复实测记录 |
 | AI 协作与贡献 | 审查 diff；说明继承与本人工作；关键改动有测试与复测 | `AGENTS.md`、`docs/ai-collaboration.md` | 文档与 Git 历史 |

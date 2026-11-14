@@ -206,18 +206,72 @@ test('质检录入与管理员放行分离，重复 PASS 不重复放行', async
     qc,
     'POST',
     `/production-orders/${taskId}/qc-records`,
-    { inspectedQuantity: 100, qualifiedQuantity: 99, unqualifiedQuantity: 1 },
+    { inspectedQuantity: 100, qualifiedQuantity: 99, unqualifiedQuantity: 1, note: '外观划伤 1 件' },
     key('partial')
   );
-  assert.equal(partial.statusCode, 409);
-  assert.equal(partial.json().error.code, 'FEATURE_NOT_ENABLED');
+  assert.equal(partial.statusCode, 201, partial.body);
+  const partialId = partial.json().data.id;
+  assert.equal(partial.json().data.decision, null);
+
+  const passOnBad = await call(
+    env.app,
+    admin,
+    'POST',
+    `/qc-records/${partialId}/decision`,
+    { decision: 'PASS' },
+    key('pass-on-bad')
+  );
+  assert.equal(passOnBad.statusCode, 409);
+  assert.equal(passOnBad.json().error.code, 'INVALID_STATE');
+
+  const rework = await call(
+    env.app,
+    admin,
+    'POST',
+    `/qc-records/${partialId}/decision`,
+    { decision: 'REWORK', note: '退回返工 1 件' },
+    key('rework')
+  );
+  assert.equal(rework.statusCode, 200, rework.body);
+  assert.equal(rework.json().data.orderStatus, 'IN_PRODUCTION');
+
+  // 返工：补产 1 件 → 重新送检 → 全合格放行
+  const reworkTask = await call(
+    env.app,
+    admin,
+    'POST',
+    `/orders/${orderId}/production-orders`,
+    {
+      orderItemId: env.db.get<{ id: string }>('SELECT id FROM order_items WHERE order_id = ?', orderId)!.id,
+      departmentId: ids.departmentId,
+      processName: '返工补产',
+      quantity: 1,
+      unitPrice: '1.00',
+      dueDate: futureDate(5),
+      priceVisible: false
+    },
+    key('rework-task')
+  );
+  assert.equal(reworkTask.statusCode, 201, reworkTask.body);
+  const reworkTaskId = reworkTask.json().data.id;
+  const reworkFeedback = await call(
+    env.app,
+    prod,
+    'POST',
+    `/production-orders/${reworkTaskId}/feedbacks`,
+    { quantity: 1 },
+    key('rework-feedback')
+  );
+  assert.equal(reworkFeedback.statusCode, 201, reworkFeedback.body);
+  const redispatch = await call(env.app, admin, 'POST', `/orders/${orderId}/dispatch-qc`, {}, key('redispatch'));
+  assert.equal(redispatch.statusCode, 200, redispatch.body);
 
   const record = await call(
     env.app,
     qc,
     'POST',
-    `/production-orders/${taskId}/qc-records`,
-    { inspectedQuantity: 100, qualifiedQuantity: 100, unqualifiedQuantity: 0 },
+    `/production-orders/${reworkTaskId}/qc-records`,
+    { inspectedQuantity: 1, qualifiedQuantity: 1, unqualifiedQuantity: 0 },
     key('qc')
   );
   assert.equal(record.statusCode, 201, record.body);
@@ -226,12 +280,15 @@ test('质检录入与管理员放行分离，重复 PASS 不重复放行', async
   const decision = await call(env.app, admin, 'POST', `/qc-records/${qcId}/decision`, { decision: 'PASS' }, key('pass'));
   assert.equal(decision.statusCode, 200, decision.body);
   assert.equal(decision.json().data.orderStatus, 'QC_DONE');
+  assert.equal(decision.json().data.releasedQty, 100);
   const repeat = await call(env.app, admin, 'POST', `/qc-records/${qcId}/decision`, { decision: 'PASS' }, key('pass-2'));
   assert.equal(repeat.statusCode, 200);
   assert.equal(repeat.json().data.releasedQty, 100);
   const released = env.db.get<{ qty: number }>(
-    'SELECT qualified_qty AS qty FROM qc_records WHERE id = ?',
-    qcId
+    `SELECT COALESCE(SUM(q.qualified_qty), 0) AS qty
+     FROM qc_records q JOIN production_orders p ON p.id = q.production_order_id
+     WHERE p.order_id = ? AND q.decision IS NOT NULL`,
+    orderId
   );
   assert.equal(released?.qty, 100);
 });
@@ -269,9 +326,9 @@ test('包装与发货数量闸门，足量后订单完成', async () => {
   assert.equal(data.order.status, 'COMPLETED');
   assert.equal(data.profit.sales, '1250.00');
   assert.equal(data.profit.purchaseCost, '252.00');
-  assert.equal(data.profit.productionCost, '120.00');
-  assert.equal(data.profit.profit, '878.00');
-  assert.equal(data.profit.margin, '70.24');
+  assert.equal(data.profit.productionCost, '121.00');
+  assert.equal(data.profit.profit, '877.00');
+  assert.equal(data.profit.margin, '70.16');
   assert.equal(data.summary.quantities.released, 100);
   assert.equal(data.summary.quantities.packed, 100);
   assert.equal(data.summary.quantities.shipped, 100);

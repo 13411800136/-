@@ -18,6 +18,7 @@ import {
   validate
 } from '../../common/validation.js';
 import type { AppContext } from '../../common/types.js';
+import { ensurePart, ensureSupplier } from '../master/auto-create.js';
 import {
   assertOrderStatus,
   getOrderOrThrow,
@@ -28,14 +29,26 @@ import {
   type PurchaseOrderRow
 } from '../orders/service.js';
 
-const createPurchaseSchema = z.object({
-  supplierId: z.string().min(1, '请选择供应商'),
-  item: z.object({
-    partId: z.string().min(1, '请选择配件'),
-    quantity: positiveInt,
-    unitPrice: moneyInput
+const createPurchaseSchema = z
+  .object({
+    supplierId: z.string().min(1).optional(),
+    supplierName: shortText(80, '供应商名称').optional(),
+    item: z.object({
+      partId: z.string().min(1).optional(),
+      partName: shortText(80, '配件名称').optional(),
+      spec: shortText(120, '规格').default(''),
+      quantity: positiveInt,
+      unitPrice: moneyInput
+    })
   })
-});
+  .refine((value) => Boolean(value.supplierId) || Boolean(value.supplierName?.trim()), {
+    message: '请选择供应商，或填写新供应商名称',
+    path: ['supplierName']
+  })
+  .refine((value) => Boolean(value.item.partId) || Boolean(value.item.partName?.trim()), {
+    message: '请选择配件，或填写新采购配件名称',
+    path: ['item', 'partName']
+  });
 
 const arrivalSchema = z.object({
   quantity: positiveInt,
@@ -87,16 +100,20 @@ export async function registerPurchaseRoutes(app: FastifyInstance, ctx: AppConte
         assertOrderStatus(order, ['PENDING_PURCHASE', 'PURCHASING'], '当前订单状态不能创建采购单');
         const existing = db.get<{ id: string }>('SELECT id FROM purchase_orders WHERE order_id = ?', orderId);
         if (existing) throw errors.conflict('该订单已存在采购单；当前最低实现为一单一采购单');
-        const supplier = db.get<{ id: string; name: string; active: number }>(
-          'SELECT id, name, active FROM suppliers WHERE id = ?',
-          input.supplierId
-        );
+        const supplier = input.supplierId
+          ? db.get<{ id: string; name: string; active: number }>(
+              'SELECT id, name, active FROM suppliers WHERE id = ?',
+              input.supplierId
+            )
+          : ensureSupplier(db, String(input.supplierName));
         if (!supplier) throw errors.validation('供应商不存在', [{ path: 'supplierId', message: '请选择有效供应商' }]);
         if (supplier.active !== 1) throw errors.validation('供应商已停用，不能新建采购', [{ path: 'supplierId', message: '供应商已停用' }]);
-        const part = db.get<{ id: string; name: string; spec: string; active: number }>(
-          'SELECT id, name, spec, active FROM parts WHERE id = ?',
-          input.item.partId
-        );
+        const part = input.item.partId
+          ? db.get<{ id: string; name: string; spec: string; active: number }>(
+              'SELECT id, name, spec, active FROM parts WHERE id = ?',
+              input.item.partId
+            )
+          : ensurePart(db, String(input.item.partName), input.item.spec);
         if (!part) throw errors.validation('配件不存在', [{ path: 'item.partId', message: '请选择有效配件' }]);
         if (part.active !== 1) throw errors.validation('配件已停用', [{ path: 'item.partId', message: '配件已停用' }]);
         const purchaseId = newId();

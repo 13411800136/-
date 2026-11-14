@@ -112,7 +112,9 @@ export function QcPage() {
       ) : (
         <QcHistoryView data={history.data} loading={history.loading} error={history.error} onRetry={history.reload} />
       )}
-      <p className="page-footnote">部分合格、返工与报废属于 F 能力，当前版本在 UI 与 API 同时拒绝，不会伪造可包装数量。</p>
+      <p className="page-footnote">
+        不合格必须如实上报：管理员会决定返工或报废，不合格数量不会计入可包装量；补产并复检通过后才能继续。
+      </p>
     </div>
   );
 }
@@ -138,7 +140,13 @@ function QcHistoryView({
       {data!.items.map((item) => (
         <article key={item.id} className="history-row">
           <span className={item.decision === 'PASS' ? 'soft-badge' : 'soft-badge soft-badge-warn'}>
-            {item.decision === 'PASS' ? 'PASS' : '待处置'}
+            {item.decision === 'PASS'
+              ? 'PASS'
+              : item.decision === 'REWORK'
+                ? '返工'
+                : item.decision === 'SCRAP'
+                  ? '报废'
+                  : '待处置'}
           </span>
           <span className="task-order-no mono">{item.orderNo}</span>
           <strong>{item.productName}</strong>
@@ -157,27 +165,46 @@ function QcForm({ task, onDone }: { task: QcTask; onDone: () => void }) {
   const toast = useToast();
   const { key } = useIntentKey('qc-');
   const [note, setNote] = useState('');
+  const [unqualified, setUnqualified] = useState('0');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unknown, setUnknown] = useState(false);
   const [done, setDone] = useState(false);
 
+  const badCount = Number(unqualified);
+  const qualifiedCount = task.producedQty - (Number.isFinite(badCount) ? badCount : 0);
+
   const submit = async () => {
     setError(null);
     setUnknown(false);
+    if (!/^\d+$/.test(unqualified)) {
+      setError('不合格量必须是非负整数');
+      return;
+    }
+    if (badCount > task.producedQty) {
+      setError(`不合格量不能超过本次检验量 ${task.producedQty}`);
+      return;
+    }
+    if (badCount > 0 && !note.trim()) {
+      setError('有不合格品时必须填写原因，便于管理员判断返工或报废');
+      return;
+    }
     setSubmitting(true);
     try {
       await api.post(
         `/production-orders/${task.productionOrderId}/qc-records`,
         {
           inspectedQuantity: task.producedQty,
-          qualifiedQuantity: task.producedQty,
-          unqualifiedQuantity: 0,
+          qualifiedQuantity: qualifiedCount,
+          unqualifiedQuantity: badCount,
           note: note.trim()
         },
         key
       );
-      toast.success('质检结果已录入', '等待管理员确认 PASS 后进入包装');
+      toast.success(
+        '质检结果已录入',
+        badCount > 0 ? '已上报不合格，等待管理员处置返工或报废' : '等待管理员确认 PASS 后进入包装'
+      );
       setDone(true);
       onDone();
     } catch (reason) {
@@ -211,18 +238,34 @@ function QcForm({ task, onDone }: { task: QcTask; onDone: () => void }) {
         </div>
         <div>
           <span>合格量</span>
-          <strong className="positive">{task.producedQty}</strong>
+          <strong className="positive">{Math.max(0, qualifiedCount)}</strong>
         </div>
         <div>
           <span>不合格量</span>
-          <strong>0</strong>
+          <strong className={badCount > 0 ? 'negative' : ''}>{badCount > 0 ? badCount : 0}</strong>
         </div>
       </div>
-      <Field label="检验备注">
-        <TextInput value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：全检合格 / 首件确认" maxLength={200} />
+      <Field
+        label="本次不合格数量"
+        hint="0 表示全部合格；大于 0 时会上报管理员，由管理员决定返工或报废"
+      >
+        <TextInput
+          value={unqualified}
+          inputMode="numeric"
+          onChange={(event) => setUnqualified(event.target.value)}
+          placeholder="0"
+        />
+      </Field>
+      <Field label={badCount > 0 ? '不合格原因（必填）' : '检验备注'}>
+        <TextInput
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder={badCount > 0 ? '例如：外观划伤 2 件 / 尺寸超差' : '例如：全检合格 / 首件确认'}
+          maxLength={200}
+        />
       </Field>
       <Button onClick={() => void submit()} loading={submitting} icon={unknown ? <RefreshCw size={15} /> : <ShieldCheck size={15} />}>
-        {unknown ? '重试原请求' : '确认全检合格并提交'}
+        {unknown ? '重试原请求' : badCount > 0 ? '上报不合格并提交' : '确认全检合格并提交'}
       </Button>
     </div>
   );

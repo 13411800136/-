@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  CircleDollarSign,
   MessageSquare,
   PackageCheck,
   ScrollText,
@@ -33,6 +34,7 @@ interface NavItem {
 const ADMIN_NAV: NavItem[] = [
   { to: '/admin', label: '业务看板', icon: LayoutDashboard, end: true },
   { to: '/admin/orders', label: '订单协同', icon: ClipboardList },
+  { to: '/admin/finance', label: '订单流水', icon: CircleDollarSign },
   { to: '/admin/inventory', label: '库存台账', icon: Boxes },
   { to: '/admin/master', label: '基础数据', icon: Users },
   { to: '/admin/exceptions', label: '现场异常', icon: AlertTriangle },
@@ -68,6 +70,7 @@ const TITLES: Array<[RegExp, string]> = [
   [/^\/admin\/orders\/new/, '创建订单'],
   [/^\/admin\/orders\/[^/]+/, '订单详情'],
   [/^\/admin\/orders$/, '订单协同'],
+  [/^\/admin\/finance$/, '订单流水'],
   [/^\/admin\/inventory$/, '库存台账'],
   [/^\/admin\/master$/, '基础数据'],
   [/^\/admin\/exceptions$/, '现场异常'],
@@ -256,7 +259,7 @@ export function AppShell() {
           <Outlet />
         </main>
         <footer className="app-footer">
-          <span>厂序 FactoryFlow · v1.3.1</span>
+          <span>厂序 FactoryFlow · v1.4.0</span>
           <span>业务时区 Asia/Shanghai · 仅合成演示数据</span>
         </footer>
       </div>

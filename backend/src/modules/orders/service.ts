@@ -308,8 +308,9 @@ export function getQuantityState(db: AppDatabase, order: OrderRow): QuantityStat
     produced: productions.reduce((sum, production) => sum + production.producedQty, 0),
     inspected: qcs.reduce((sum, record) => sum + record.inspected_qty, 0),
     qualified: qcs.reduce((sum, record) => sum + record.qualified_qty, 0),
+    // 合格品在处置后即可用；返工/报废只作用于不合格部分，不吞掉已合格数量
     released: qcs
-      .filter((record) => record.decision === 'PASS')
+      .filter((record) => record.decision !== null)
       .reduce((sum, record) => sum + record.qualified_qty, 0),
     packed: packings.reduce((sum, packing) => sum + packing.quantity, 0),
     shipped: shipments.reduce((sum, shipment) => sum + shipment.quantity, 0)
@@ -375,14 +376,15 @@ export function buildOperationSummary(db: AppDatabase, order: OrderRow): Operati
     if (productions.some((production) => production.producedQty < production.quantity)) {
       allowed.push('RECORD_FEEDBACK');
     }
-    if ((state.taskQuantity ?? 0) < state.ordered) {
+    const needsMoreOutput = (state.taskQuantity ?? 0) < state.ordered || state.released < state.ordered;
+    if (needsMoreOutput) {
       allowed.push('DISPATCH_PRODUCTION');
     }
     if (
       productions.length > 0 &&
       productions.every((production) => production.producedQty >= production.quantity) &&
       state.produced >= state.ordered &&
-      qcs.length === 0
+      qcs.every((qc) => qc.decision !== null)
     ) {
       allowed.push('DISPATCH_QC');
     }
@@ -442,6 +444,9 @@ function nextStepOf(status: OrderStatus, state: QuantityState, hasPurchase: bool
     case 'IN_PRODUCTION':
       if (state.taskQuantity !== null && state.produced < state.taskQuantity) {
         return `等待生产反馈（${state.produced}/${state.taskQuantity}）`;
+      }
+      if (state.released < state.ordered) {
+        return `不合格退回：已放行 ${state.released}/${state.ordered}，需补产 ${state.ordered - state.released} 件后再送检`;
       }
       return '生产完成，下发质检';
     case 'PENDING_QC':

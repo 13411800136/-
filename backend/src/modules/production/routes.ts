@@ -139,7 +139,16 @@ export async function registerProductionRoutes(app: FastifyInstance, ctx: AppCon
           (sum, production) => sum + production.quantity,
           0
         );
-        const remainingToAssign = item.quantity - assigned;
+        // 质检判定的不合格（返工/报废）需要等量补产，因此可分配上限 = 订单量 + 已判不合格量
+        const rejected = db.get<{ qty: number | null }>(
+          `SELECT COALESCE(SUM(q.unqualified_qty), 0) AS qty
+           FROM qc_records q
+           JOIN production_orders p ON p.id = q.production_order_id
+           WHERE p.order_id = ? AND q.decision IN ('REWORK', 'SCRAP')`,
+          orderId
+        );
+        const capacity = item.quantity + (rejected?.qty ?? 0);
+        const remainingToAssign = capacity - assigned;
         if (remainingToAssign <= 0) {
           throw errors.conflict('订单数量已全部分配到生产任务，不能继续新增', {
             ordered: item.quantity,

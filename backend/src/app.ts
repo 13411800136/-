@@ -25,6 +25,7 @@ import { registerDashboardRoutes } from './modules/dashboard/routes.js';
 import { registerExceptionRoutes } from './modules/exceptions/routes.js';
 import { registerAuditRoutes } from './modules/audit/routes.js';
 import { registerMessageRoutes } from './modules/messages/routes.js';
+import { registerFinanceRoutes } from './modules/finance/routes.js';
 import type { AppContext } from './common/types.js';
 import type { AppConfig } from './config.js';
 import type { AppDatabase } from './db/database.js';
@@ -128,6 +129,7 @@ export async function buildApp(options: BuildAppOptions): Promise<FastifyInstanc
       await registerExceptionRoutes(api, ctx);
       await registerAuditRoutes(api, ctx);
       await registerMessageRoutes(api, ctx);
+  await registerFinanceRoutes(api, ctx);
     },
     { prefix: '/api/v1' }
   );

@@ -21,6 +21,7 @@ import {
   validate
 } from '../../common/validation.js';
 import type { AppContext } from '../../common/types.js';
+import { ensureCustomer, ensurePart } from '../master/auto-create.js';
 import {
   buildOperationSummary,
   buildProfit,
@@ -37,18 +38,25 @@ import {
   type OrderStatus
 } from './service.js';
 
-const createOrderSchema = z.object({
-  customerId: z.string().min(1, '请选择客户'),
-  dueDate: dateInput,
-  note: shortText(300, '备注').default(''),
-  item: z.object({
-    partId: z.string().min(1).optional(),
-    productName: requiredText(80, '产品名称'),
-    spec: shortText(120, '规格').default(''),
-    quantity: positiveInt,
-    unitPrice: moneyInput
+const createOrderSchema = z
+  .object({
+    customerId: z.string().min(1).optional(),
+    customerName: shortText(80, '客户名称').optional(),
+    dueDate: dateInput,
+    note: shortText(300, '备注').default(''),
+    item: z.object({
+      partId: z.string().min(1).optional(),
+      partName: shortText(80, '配件名称').optional(),
+      productName: requiredText(80, '产品名称'),
+      spec: shortText(120, '规格').default(''),
+      quantity: positiveInt,
+      unitPrice: moneyInput
+    })
   })
-});
+  .refine((value) => Boolean(value.customerId) || Boolean(value.customerName?.trim()), {
+    message: '请选择客户，或填写新客户名称',
+    path: ['customerName']
+  });
 
 const listQuery = pageQuery.extend({
   status: z
@@ -168,28 +176,49 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
             { path: 'dueDate', message: '请选择今天或之后的日期' }
           ]);
         }
-        const customer = db.get<{ id: string; name: string; active: number }>(
-          'SELECT id, name, active FROM customers WHERE id = ?',
-          input.customerId
-        );
-        if (!customer) throw errors.validation('客户不存在', [{ path: 'customerId', message: '请选择有效客户' }]);
-        if (customer.active !== 1) throw errors.validation('客户已停用，不能新建订单', [{ path: 'customerId', message: '客户已停用' }]);
         if (input.item.partId) {
           const part = db.get<{ active: number }>('SELECT active FROM parts WHERE id = ?', input.item.partId);
           if (!part) throw errors.validation('配件不存在', [{ path: 'item.partId', message: '请选择有效配件' }]);
           if (part.active !== 1) throw errors.validation('配件已停用', [{ path: 'item.partId', message: '配件已停用' }]);
         }
+        const now = nowIso();
+        const customer = input.customerId
+          ? (() => {
+              const found = db.get<{ id: string; name: string; active: number }>(
+                'SELECT id, name, active FROM customers WHERE id = ?',
+                input.customerId
+              );
+              if (!found) throw errors.validation('客户不存在', [{ path: 'customerId', message: '请选择有效客户' }]);
+              if (found.active !== 1) {
+                throw errors.validation('客户已停用，不能新建订单', [{ path: 'customerId', message: '客户已停用' }]);
+              }
+              return { id: found.id, name: found.name, auto: false };
+            })()
+          : (() => {
+              const created = ensureCustomer(db, String(input.customerName));
+              return { id: created.id, name: created.name, auto: created.created };
+            })();
+        const autoCustomer = customer.auto;
+        const customerId = customer.id;
+        const customerName = customer.name;
+        if (input.item.partId) {
+          const part = db.get<{ active: number }>('SELECT active FROM parts WHERE id = ?', input.item.partId);
+          if (!part) throw errors.validation('配件不存在', [{ path: 'item.partId', message: '请选择有效配件' }]);
+          if (part.active !== 1) throw errors.validation('配件已停用', [{ path: 'item.partId', message: '配件已停用' }]);
+        }
+        const partId = input.item.partId ?? (input.item.partName?.trim()
+          ? ensurePart(db, input.item.partName, input.item.spec).id
+          : null);
         const orderId = newId();
         const itemId = newId();
-        const now = nowIso();
         const orderNo = documentNo(db, 'SO');
         db.run(
           `INSERT INTO orders(id, order_no, customer_id, customer_name, due_date, status, note, created_by, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, 'PENDING_PURCHASE', ?, ?, ?, ?)`,
           orderId,
           orderNo,
-          customer.id,
-          customer.name,
+          customerId,
+          customerName,
           input.dueDate,
           input.note,
           actor.id,
@@ -201,7 +230,7 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           itemId,
           orderId,
-          input.item.partId ?? null,
+          partId,
           input.item.productName,
           input.item.spec,
           input.item.quantity,
@@ -226,7 +255,8 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
           result: 'SUCCESS',
           after: {
             orderNo,
-            customer: customer.name,
+            customer: customerName,
+            customerAutoCreated: autoCustomer,
             dueDate: input.dueDate,
             item: { ...input.item, unitPrice: formatCents(input.item.unitPrice) }
           }

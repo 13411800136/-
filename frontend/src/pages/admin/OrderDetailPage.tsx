@@ -514,10 +514,20 @@ export function OrderDetailPage() {
                   </div>
                   <div>
                     <span>决策</span>
-                    <strong className={qc.every((record) => record.decision === 'PASS') ? 'positive' : ''}>
+                    <strong
+                      className={
+                        qc.every((record) => record.decision === 'PASS')
+                          ? 'positive'
+                          : qc.some((record) => record.decision === 'REWORK' || record.decision === 'SCRAP')
+                            ? 'negative'
+                            : ''
+                      }
+                    >
                       {qc.every((record) => record.decision === 'PASS')
                         ? '全部 PASS 已放行'
-                        : `${qc.filter((record) => record.decision === null).length} 条待处置`}
+                        : qc.some((record) => record.decision === 'REWORK' || record.decision === 'SCRAP')
+                          ? '不合格已处置，待补产复检'
+                          : `${qc.filter((record) => record.decision === null).length} 条待处置`}
                     </strong>
                   </div>
                 </div>
@@ -525,9 +535,19 @@ export function OrderDetailPage() {
                   <Alert tone="success" title="质检已放行">
                     共 {qc.length} 条任务质检已确认，放行 {qc.reduce((sum, record) => sum + record.qualifiedQty, 0)} 件。
                   </Alert>
+                ) : qc.some((record) => record.decision === 'REWORK' || record.decision === 'SCRAP') ? (
+                  <Alert tone="danger" title="存在不合格品，已退回生产">
+                    报废{' '}
+                    {qc.filter((record) => record.decision === 'SCRAP').reduce((sum, record) => sum + record.unqualifiedQty, 0)}{' '}
+                    件、返工{' '}
+                    {qc.filter((record) => record.decision === 'REWORK').reduce((sum, record) => sum + record.unqualifiedQty, 0)}{' '}
+                    件。请补产相同数量并重新送检；合格量累计覆盖应交量后才会进入包装。
+                  </Alert>
                 ) : (
                   <Alert tone="warning" title="等待管理员处置">
-                    品控保存结果不等于放行。管理员确认 PASS 后，包装队列才会出现可包装数量。
+                    {qc.some((record) => record.unqualifiedQty > 0)
+                      ? '本次存在不合格品：只能选择返工或报废，不能直接放行。'
+                      : '品控保存结果不等于放行。管理员确认 PASS 后，包装队列才会出现可包装数量。'}
                   </Alert>
                 )}
                 {qc.length > 1 ? (
@@ -540,7 +560,13 @@ export function OrderDetailPage() {
                         <div>
                           <strong>
                             检验 {record.inspectedQty} · 合格 {record.qualifiedQty} ·{' '}
-                            {record.decision === 'PASS' ? 'PASS' : '待处置'}
+                            {record.decision === 'PASS'
+                              ? 'PASS'
+                              : record.decision === 'REWORK'
+                                ? '返工'
+                                : record.decision === 'SCRAP'
+                                  ? '报废'
+                                  : '待处置'}
                           </strong>
                           <span>
                             {record.inspectorName} · {fmtDateTime(record.createdAt)}

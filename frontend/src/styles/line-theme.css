@@ -1023,6 +1023,109 @@ th.num {
   transform: none;
 }
 
+/* ---------- 10.5 建单快速建档与订单流水 ---------- */
+
+.inline-create {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 2px;
+  background: var(--card-2);
+}
+
+.inline-create small {
+  color: var(--faint);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.finance-kpis {
+  margin-bottom: 0;
+}
+
+.finance-waterfall {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 4px 0 10px;
+}
+
+.finance-bar {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) 110px;
+  align-items: center;
+  gap: 12px;
+}
+
+.finance-bar-label {
+  color: var(--muted);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+
+.finance-bar-track {
+  height: 12px;
+  border: 1px solid var(--line);
+  background: var(--card-2);
+  overflow: hidden;
+}
+
+.finance-bar-fill {
+  display: block;
+  height: 100%;
+}
+
+.finance-bar-fill.tone-sales {
+  background: var(--ink);
+}
+
+.finance-bar-fill.tone-cost {
+  background: #b08a6a;
+}
+
+.finance-bar-fill.tone-profit {
+  background: var(--signal);
+}
+
+.finance-bar-fill.tone-negative {
+  background: var(--danger);
+}
+
+.finance-bar-value {
+  text-align: right;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.finance-bar-total {
+  padding-top: 7px;
+  border-top: 1px dashed var(--line);
+}
+
+.finance-bar-total .finance-bar-label,
+.finance-bar-total .finance-bar-value {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.finance-table-head h2 {
+  font-size: 13.5px;
+}
+
+.finance-table-head p {
+  margin-top: 3px;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.finance-table td .status-pill {
+  margin-left: 8px;
+}
+
 /* ---------- 11. 弹窗与提示 ---------- */
 
 .modal {
