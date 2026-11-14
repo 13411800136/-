@@ -1,6 +1,6 @@
 # API 合同：厂序 FactoryFlow
 
-版本：v1.3.0（2026-11-09）
+版本：v1.3.1（2026-11-09）
 前缀：`/api/v1`；Content-Type：`application/json`（附件上传为 multipart，导出为 xlsx）。
 成功：`{ "data": ..., "requestId": "..." }`；失败：`{ "error": { "code": "...", "message": "...", "details": ... }, "requestId": "..." }`。
 

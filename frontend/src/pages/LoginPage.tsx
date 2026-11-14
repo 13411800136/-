@@ -100,6 +100,7 @@ export function LoginPage() {
             </div>
           ))}
         </div>
+        <p className="login-flow-note">主流转 7 个工位；电镀本版不适用，未列入。</p>
         <div className="login-proof">
           <div>
             <strong>5</strong>
@@ -208,7 +209,7 @@ export function LoginPage() {
           </div>
         </div>
         <p className="login-footnote">
-          厂序 FactoryFlow · 第三轮考核项目 · 业务时区 北京时间（UTC+08:00）
+          厂序 FactoryFlow · 业务时区 北京时间（UTC+08:00） · 合成演示环境
         </p>
       </section>
     </div>

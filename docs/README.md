@@ -1,6 +1,6 @@
 # 文档索引
 
-版本：v1.3.0 / 2026-11-09
+版本：v1.3.1 / 2026-11-09
 本目录与仓库根文档共同构成当前版本的设计合同。历史/失效内容不得混入当前入口；如后续替代，在此标注“已替代”。
 
 | 文档 | 回答什么问题 | 状态 |
@@ -10,6 +10,7 @@
 | [../AGENTS.md](../AGENTS.md) | AI/协作者先读什么、允许改什么、如何验证 | 当前 |
 | [../CONSTRAINTS.md](../CONSTRAINTS.md) | 哪些质量底线不可降低、在哪里执行 | 当前 |
 | [architecture.md](architecture.md) | 模块边界、请求路径、事务/幂等/并发、静态文件 | 当前 |
+| [design-direction.md](design-direction.md) | 视觉方向 brief、落地清单、独立评审与遗留问题 | 当前 |
 | [api-contract.md](api-contract.md) | 方法路径、认证、Schema、错误、幂等、事务、示例 | 当前 |
 | [data-dictionary.md](data-dictionary.md) | 表、字段、类型、约束、索引、关系、敏感性 | 当前 |
 | [state-and-quantity.md](state-and-quantity.md) | 状态迁移、数量公式、动作守卫、金额/日期语义 | 当前 |

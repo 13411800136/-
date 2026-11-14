@@ -1,6 +1,6 @@
 # 状态、数量与金额口径
 
-版本：v1.3.0 / 2026-11-09
+版本：v1.3.1 / 2026-11-09
 关联：[PRD](../PRD-factory.md) · [API 合同](api-contract.md) · [数据字典](data-dictionary.md)
 
 ## 1. 订单主状态

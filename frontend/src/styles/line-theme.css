@@ -1,0 +1,1228 @@
+/* ============================================================
+   厂序 FactoryFlow · 工位轨道视觉层（v1.3.0）
+   在 global.css 之后加载；只覆盖视觉，不改结构、交互与业务。
+   方向说明见 docs/design-direction.md
+   ============================================================ */
+
+/* ---------- 1. 设计令牌 ---------- */
+
+:root {
+  --ink: #111614;
+  --ink-2: #18211d;
+  --ink-3: #24302b;
+  --paper: #ece7da;
+  --paper-2: #e1dbc9;
+  --card: #fffdf6;
+  --card-2: #f6f2e5;
+  --line: #d3ccba;
+  --line-strong: #b3a992;
+  --text: #151c19;
+  --muted: #62675e;
+  --faint: #8e9287;
+
+  --signal: #dd9f22;
+  --signal-soft: #f7e9c8;
+  --accent: #8f6510;
+  --accent-dark: #6d4c0b;
+  --accent-soft: #f5e8cc;
+
+  --teal: #1b5a45;
+  --teal-soft: #dae8e0;
+  --gold: #8f6510;
+  --gold-soft: #f5e8cc;
+  --danger: #9d3227;
+  --danger-soft: #f7e2dd;
+  --blue: #275f7c;
+  --blue-soft: #dfeaf1;
+  --violet: #5c4f86;
+  --violet-soft: #e9e5f3;
+  --orange: #a2581f;
+  --orange-soft: #f6e6d5;
+  --cyan: #21696d;
+  --cyan-soft: #dceceb;
+  --green: #276141;
+  --green-soft: #dcebe1;
+  --slate: #5c655f;
+  --slate-soft: #e7e9e3;
+
+  --radius: 2px;
+  --radius-sm: 1px;
+  --shadow-card: none;
+  --shadow-float: 0 22px 48px rgba(17, 22, 20, 0.28);
+  --sidebar-width: 236px;
+  --topbar-height: 62px;
+
+  --rail: rgba(17, 22, 20, 0.14);
+  --rail-light: rgba(244, 239, 227, 0.14);
+}
+
+body {
+  font-family: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  font-size: 13.5px;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(rgba(17, 22, 20, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 22, 20, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 76% -10%, rgba(221, 159, 34, 0.1), transparent 46%);
+  background-size: 32px 32px, 32px 32px, auto;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+
+.mono,
+.money,
+.num,
+.stat-value,
+.metric-value,
+.profit-panel-hero strong,
+td.num,
+th.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ---------- 2. 外壳：左侧工位轨道 ---------- */
+
+.sidebar {
+  width: var(--sidebar-width);
+  padding: 18px 14px 14px;
+  background:
+    linear-gradient(180deg, #0e1412 0%, #131b17 62%, #16201b 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sidebar::before {
+  background-image:
+    repeating-linear-gradient(
+      180deg,
+      var(--rail-light) 0 1px,
+      transparent 1px 24px
+    );
+  background-size: 100% 24px;
+  opacity: 0.28;
+}
+
+/* 轨道尺：左缘刻度 */
+.sidebar::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 5px;
+  width: 6px;
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(221, 159, 34, 0.5) 0 1px,
+    transparent 1px 8px
+  );
+  background-size: 6px 8px;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.brand {
+  padding: 2px 6px 16px;
+}
+
+.brand .brand-mark {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(221, 159, 34, 0.55);
+  border-radius: 0;
+  background: rgba(221, 159, 34, 0.1);
+  color: #f0d9a4;
+  font-size: 16px;
+}
+
+.brand-copy strong {
+  color: #f2ede0;
+  font-size: 17px;
+  letter-spacing: 0.16em;
+}
+
+.brand-copy small {
+  color: #7d8a80;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 7.5px;
+  letter-spacing: 0.2em;
+}
+
+.sidebar-context {
+  margin: 0 6px 14px;
+  padding: 8px 10px;
+  border: 0;
+  border-left: 2px solid var(--signal);
+  border-radius: 0;
+  background: rgba(244, 239, 227, 0.04);
+}
+
+.context-label {
+  color: #808d83;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+}
+
+.context-value {
+  color: #e8e3d4;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+}
+
+.main-nav {
+  gap: 0;
+  padding: 0;
+  counter-reset: station;
+}
+
+.nav-item {
+  position: relative;
+  gap: 10px;
+  padding: 9px 10px 9px 26px;
+  border-radius: 0;
+  border-top: 1px solid rgba(244, 239, 227, 0.07);
+  color: #a4b0a6;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  counter-increment: station;
+  transition: color 0.14s ease, background 0.14s ease, padding-left 0.14s ease;
+}
+
+.nav-item::before {
+  content: counter(station, decimal-leading-zero);
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #5d6b62;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8.5px;
+  letter-spacing: 0.02em;
+}
+
+.nav-item::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 4px;
+  height: 1px;
+  background: rgba(244, 239, 227, 0.22);
+}
+
+.nav-item:hover {
+  background: rgba(244, 239, 227, 0.05);
+  color: #efe9da;
+  padding-left: 29px;
+}
+
+.nav-item-active,
+.nav-item-active:hover {
+  background: rgba(221, 159, 34, 0.12);
+  color: #f6dda8;
+  box-shadow: inset 2px 0 0 var(--signal);
+}
+
+.nav-item-active::before {
+  color: var(--signal);
+}
+
+.nav-item-active::after {
+  width: 10px;
+  background: var(--signal);
+}
+
+.nav-badge {
+  border-radius: 1px;
+  background: var(--signal);
+  color: #1a1305;
+  font-weight: 700;
+}
+
+.sidebar-note {
+  margin: 10px 6px;
+  padding: 9px 10px;
+  border-left: 2px solid rgba(221, 159, 34, 0.6);
+  border-radius: 0;
+  background: rgba(244, 239, 227, 0.03);
+}
+
+.sidebar-note-title {
+  color: #ded8c8;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.sidebar-note p {
+  color: #7c887e;
+  font-size: 10px;
+}
+
+.sidebar-user {
+  padding: 9px 6px 2px;
+  border-top: 1px solid rgba(244, 239, 227, 0.1);
+}
+
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 1px;
+  background: var(--signal);
+  color: #1a1305;
+  font-weight: 700;
+}
+
+.sidebar-user-copy strong {
+  color: #eee8db;
+  font-size: 11px;
+}
+
+.sidebar-user-copy span {
+  color: #7c887e;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+}
+
+/* 交付数量条 */
+.delivery-metric {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card-2);
+}
+
+.delivery-metric span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.delivery-metric strong {
+  color: var(--ink);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 22px;
+}
+
+.sidebar-foot,
+.sidebar-user {
+  border-radius: 0;
+}
+
+/* 顶栏 */
+.topbar {
+  height: var(--topbar-height);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 253, 246, 0.92);
+  backdrop-filter: blur(6px);
+}
+
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--signal) 0 8px,
+    transparent 8px 16px
+  );
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.topbar-kicker {
+  color: var(--faint);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+}
+
+.topbar-title strong {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.topbar-bell {
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+
+.topbar-avatar {
+  border-radius: 2px;
+  background: var(--ink);
+  color: #f4efe3;
+  font-family: "Cascadia Code", Consolas, monospace;
+  letter-spacing: 0.06em;
+}
+
+.app-footer {
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---------- 3. 页面标题与间距 ---------- */
+
+.page-content {
+  padding: 18px 26px 30px;
+}
+
+.stack-lg {
+  gap: 15px;
+}
+
+.card {
+  padding: 15px 17px;
+}
+
+.section-title {
+  margin-bottom: 11px;
+}
+
+.page-header {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 2px;
+}
+
+.page-header h1 {
+  font-size: 26px;
+  letter-spacing: -0.03em;
+}
+
+.kpi-value {
+  font-size: 22px;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 14px;
+  height: 2px;
+  background: var(--signal);
+}
+
+.eyebrow-light {
+  color: #c8a75a;
+}
+
+.eyebrow-light::before {
+  background: var(--signal);
+}
+
+.page-description {
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.65;
+}
+
+.page-footnote {
+  color: var(--faint);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- 4. 工单纸面（卡片） ---------- */
+
+.card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+  box-shadow: none;
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+.card:hover {
+  border-color: var(--line-strong);
+}
+
+.section-title {
+  padding-bottom: 9px;
+  border-bottom: 1px dashed var(--line);
+}
+
+.section-title h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  letter-spacing: 0.01em;
+}
+
+.section-title h2::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: var(--ink);
+}
+
+.section-title p {
+  color: var(--faint);
+  font-size: 10.5px;
+  letter-spacing: 0.01em;
+}
+
+/* 统计块 */
+.stat-card,
+.metric-card,
+.kpi-card {
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+
+.stat-label,
+.metric-label,
+.kpi-label {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.stat-value,
+.kpi-value {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+
+.kpi-foot {
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.kpi-icon {
+  border-radius: 1px;
+  background: var(--card-2);
+}
+
+/* 每屏一个墨色锚点面板：读数用浅纸色，强调用信号黄 */
+.profit-card,
+.profit-panel-card {
+  border-color: #2b332d;
+  background: linear-gradient(152deg, #101614 0%, #1a231e 100%);
+  color: #e8e2d1;
+}
+
+.kpi-ink {
+  border-color: var(--line);
+  background: var(--card);
+  color: var(--ink);
+  border-left: 3px solid var(--signal);
+}
+
+.kpi-ink .kpi-label {
+  color: var(--muted);
+}
+
+.kpi-ink .kpi-value {
+  color: var(--ink);
+}
+
+.kpi-ink .kpi-foot {
+  color: var(--faint);
+}
+
+.kpi-ink .kpi-icon {
+  background: var(--card-2);
+  color: var(--ink);
+}
+
+.profit-card .section-title,
+.profit-panel-card .section-title {
+  border-bottom-color: rgba(244, 239, 227, 0.14);
+}
+
+.profit-card .section-title h2,
+.profit-panel-card .section-title h2 {
+  color: #f4eedd;
+}
+
+.profit-card .section-title h2::before,
+.profit-panel-card .section-title h2::before {
+  background: var(--signal);
+}
+
+.profit-card .section-title p,
+.profit-panel-card .section-title p {
+  color: #8b968c;
+}
+
+.profit-panel-hero > span:first-child {
+  color: #8b968c;
+}
+
+.profit-panel-hero strong {
+  color: #f7f1e1;
+}
+
+.profit-panel-margin {
+  color: var(--signal);
+}
+
+.profit-lines div {
+  color: #8b968c;
+}
+
+.profit-lines strong {
+  color: #efe8d6;
+}
+
+.profit-scope {
+  color: #7f8a80;
+}
+
+.profit-card .section-title {
+  border-bottom-color: rgba(244, 239, 227, 0.14);
+}
+
+.profit-card .section-title h2 {
+  color: #f4eedd;
+}
+
+.profit-card .section-title h2::before {
+  background: var(--signal);
+}
+
+.profit-card .section-title p {
+  color: #8b968c;
+}
+
+.profit-hero {
+  border-bottom-color: rgba(244, 239, 227, 0.12);
+}
+
+.profit-hero > span:first-child {
+  color: #8b968c;
+}
+
+.profit-hero strong {
+  color: #f7f1e1;
+}
+
+.profit-margin {
+  color: var(--signal);
+}
+
+.profit-breakdown div {
+  color: #8b968c;
+}
+
+.profit-breakdown strong {
+  color: #efe8d6;
+}
+
+.profit-note {
+  color: #7f8a80;
+}
+
+.profit-stack {
+  background: rgba(244, 239, 227, 0.14);
+}
+
+.profit-stack-profit {
+  background: var(--signal);
+}
+
+.profit-stack-cost {
+  background: #7d5a4a;
+}
+
+/* ---------- 5. 按钮 ---------- */
+
+.btn {
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  transition: transform 0.12s ease, background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  border: 1px solid var(--ink);
+  border-bottom: 2px solid var(--signal);
+  background: var(--ink);
+  color: #f7f2e4;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--ink-3);
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--ink);
+  background: rgba(17, 22, 20, 0.04);
+}
+
+.btn-ghost {
+  border: 1px solid transparent;
+  color: var(--muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--line);
+  background: transparent;
+  color: var(--ink);
+}
+
+.btn-dark {
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: var(--ink-3);
+}
+
+.btn-danger {
+  border: 1px solid var(--danger);
+  border-bottom: 2px solid #6f2018;
+  background: var(--danger);
+  color: #fff8f4;
+}
+
+/* ---------- 6. 表单 ---------- */
+
+.input,
+.select,
+.textarea {
+  border-radius: 2px;
+  border: 1px solid var(--line-strong);
+  background: #fffef9;
+  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(221, 159, 34, 0.28);
+  outline: none;
+}
+
+.field > span,
+.field-label {
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+/* ---------- 7. 台账表格 ---------- */
+
+.card-table {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+}
+
+.data-table {
+  border-collapse: collapse;
+}
+
+.data-table th {
+  border-bottom: 1px solid var(--ink);
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 9px 12px;
+}
+
+.data-table td {
+  border-bottom: 1px dashed var(--line);
+  padding: 10px 12px;
+  font-size: 12.5px;
+}
+
+.data-table tbody tr:hover td {
+  background: rgba(221, 159, 34, 0.06);
+}
+
+.data-table .num,
+.data-table .money {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 12px;
+}
+
+.order-no,
+.task-order-no {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+/* ---------- 8. 状态印章 ---------- */
+
+.status-pill {
+  border-radius: 1px;
+  border: 1px solid var(--line);
+  border-left: 3px solid currentColor;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 2px 7px 2px 6px;
+}
+
+.status-pill::before {
+  content: none;
+}
+
+.status-pill.tone-slate {
+  color: #4a544d;
+}
+.status-pill.tone-amber {
+  color: #8a5f0c;
+}
+.status-pill.tone-teal {
+  color: #164c3a;
+}
+.status-pill.tone-violet {
+  color: #4a3d75;
+}
+.status-pill.tone-blue {
+  color: #1d4f6a;
+}
+.status-pill.tone-orange {
+  color: #8a4715;
+}
+.status-pill.tone-cyan {
+  color: #18585c;
+}
+.status-pill.tone-green {
+  color: #1d5236;
+}
+
+.soft-badge,
+.count-chip,
+.hint-chip,
+.waiting-chip,
+.complete-chip,
+.due-chip {
+  border-radius: 2px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.due-chip {
+  border: 1px solid var(--line);
+  background: transparent;
+}
+
+/* ---------- 9. 工序轨（阶段条） ---------- */
+
+.stage-card {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card-2);
+  padding: 14px 16px;
+  position: sticky;
+  top: calc(var(--topbar-height) + 6px);
+  z-index: 6;
+}
+
+.stage-stepper {
+  gap: 0;
+  align-items: stretch;
+}
+
+.stage {
+  gap: 9px;
+}
+
+.stage-marker {
+  position: relative;
+  align-items: center;
+}
+
+.stage-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--card);
+  color: var(--muted);
+}
+
+.stage-connector {
+  height: 1px;
+  background: var(--line-strong);
+}
+
+.stage-copy strong {
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.stage-copy small {
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.03em;
+  color: var(--faint);
+}
+
+.stage-done .stage-icon {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #f6f1e2;
+}
+
+.stage-done .stage-copy strong {
+  color: var(--ink);
+}
+
+.stage-done .stage-connector {
+  height: 2px;
+  background: var(--ink);
+}
+
+.stage-active .stage-icon {
+  width: 34px;
+  height: 34px;
+  border-color: var(--accent-dark);
+  background: var(--signal);
+  color: #1a1305;
+  box-shadow: 0 0 0 3px rgba(221, 159, 34, 0.22);
+}
+
+.stage-active .stage-copy strong {
+  color: var(--accent-dark);
+  font-size: 12px;
+}
+
+.stage-not_applicable {
+  opacity: 1;
+}
+
+.stage-not_applicable .stage-icon {
+  border-style: dashed;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--faint);
+}
+
+.stage-not_applicable .stage-copy strong,
+.stage-not_applicable .stage-copy small {
+  color: var(--faint);
+}
+
+/* ---------- 10. 现场工作台 ---------- */
+
+.tablet-head,
+.tablet-summary {
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+
+.tablet-summary > div {
+  border-right: 1px dashed var(--line);
+}
+
+.tablet-summary > div:last-child {
+  border-right: 0;
+}
+
+.tablet-task {
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink);
+  background: var(--card);
+}
+
+.tablet-task:hover {
+  border-left-color: var(--signal);
+}
+
+.tablet-metric,
+.task-metric {
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card-2);
+}
+
+.history-row {
+  border-bottom: 1px dashed var(--line);
+}
+
+.history-row:last-child {
+  border-bottom: 0;
+}
+
+/* 进度条：工位推进 */
+.progress,
+.progress-track {
+  border-radius: 0;
+}
+
+.progress > span,
+.progress-bar {
+  border-radius: 0;
+}
+
+/* 空状态里的重复主操作降级为文字链，每屏只留一个实心主按钮 */
+.empty-state .btn {
+  border: 0;
+  border-bottom: 1px dashed var(--line-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 2px 0;
+}
+
+.empty-state .btn:hover:not(:disabled) {
+  background: transparent;
+  border-bottom-color: var(--ink);
+  transform: none;
+}
+
+/* ---------- 11. 弹窗与提示 ---------- */
+
+.modal {
+  border-radius: 2px;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+  box-shadow: var(--shadow-float);
+}
+
+.modal-head {
+  border-bottom: 1px solid var(--line);
+}
+
+.modal-head h2 {
+  letter-spacing: -0.01em;
+}
+
+.modal-foot {
+  border-top: 1px dashed var(--line);
+  background: var(--card-2);
+}
+
+.modal-overlay {
+  background: rgba(17, 22, 20, 0.58);
+  backdrop-filter: blur(2px);
+}
+
+.toast {
+  border-radius: 2px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--signal);
+  background: var(--card);
+}
+
+.alert {
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink);
+  background: var(--card-2);
+}
+
+/* ---------- 12. 登录页 ---------- */
+
+.login-page {
+  background: var(--paper);
+}
+
+.login-visual {
+  background:
+    linear-gradient(rgba(244, 239, 227, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(244, 239, 227, 0.05) 1px, transparent 1px),
+    linear-gradient(160deg, #0d1311 0%, #141d18 58%, #1a241e 100%);
+  background-size: 40px 40px, 40px 40px, auto;
+}
+
+.login-visual::after {
+  background-image: repeating-linear-gradient(
+    180deg,
+    rgba(221, 159, 34, 0.35) 0 1px,
+    transparent 1px 12px
+  );
+  background-size: 5px 12px;
+  opacity: 0.5;
+}
+
+.login-hero h1 {
+  font-size: 42px;
+  letter-spacing: -0.045em;
+  line-height: 1.16;
+}
+
+.login-flow-step .flow-index {
+  font-family: "Cascadia Code", Consolas, monospace;
+  color: var(--signal);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+}
+
+.login-flow-step .flow-label {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+}
+
+.login-flow-step .flow-line {
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(244, 239, 227, 0.35) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.login-proof strong {
+  font-family: "Cascadia Code", Consolas, monospace;
+  letter-spacing: -0.02em;
+}
+
+.login-flow-note {
+  margin-top: 8px;
+  color: #b3bfb4;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+}
+
+.login-card {
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: none;
+}
+
+.login-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--signal) 0 10px,
+    transparent 10px 20px
+  );
+  opacity: 0.5;
+}
+
+.login-input-wrap {
+  border-radius: 2px;
+  border: 1px solid var(--line-strong);
+  background: #fffef9;
+}
+
+.login-input-wrap:focus-within {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px rgba(221, 159, 34, 0.26);
+}
+
+.login-submit {
+  border-radius: 2px;
+  letter-spacing: 0.06em;
+}
+
+.demo-account {
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  background: transparent;
+  text-align: left;
+  transition: border-color 0.14s ease, background 0.14s ease, transform 0.12s ease;
+}
+
+.demo-account:hover {
+  border-color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.demo-account-active {
+  border-color: var(--ink);
+  background: rgba(221, 159, 34, 0.1);
+  box-shadow: inset 2px 0 0 var(--signal);
+}
+
+.demo-icon,
+.brand-mark,
+.role-avatar {
+  border-radius: 1px;
+}
+
+.login-footnote {
+  color: var(--faint);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+}
+
+/* ---------- 13. 无障碍与窄屏 ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .nav-item,
+  .demo-account {
+    transition: none;
+  }
+
+  .btn-primary:hover:not(:disabled),
+  .demo-account:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .page-header h1 {
+    font-size: 24px;
+  }
+
+  .stage-copy small {
+    display: none;
+  }
+
+  .stage-icon {
+    width: 22px;
+    height: 22px;
+  }
+}
