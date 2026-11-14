@@ -58,8 +58,8 @@
   background-size: 0% 100%;
   transition:
     background-size var(--fx-duration) var(--fx-ease),
-    color 0.28s ease,
-    border-color 0.28s ease;
+    color var(--fx-duration) var(--fx-ease),
+    border-color var(--fx-duration) var(--fx-ease);
 }
 
 .fx-mask:hover:not(:disabled),
@@ -94,9 +94,9 @@
   transition:
     clip-path var(--fx-duration) var(--fx-ease),
     transform var(--fx-duration) var(--fx-ease),
-    background-color 0.2s ease,
-    color 0.2s ease,
-    border-color 0.2s ease;
+    background-color var(--fx-duration) var(--fx-ease),
+    color var(--fx-duration) var(--fx-ease),
+    border-color var(--fx-duration) var(--fx-ease);
 }
 
 .fx-morph:hover:not(:disabled) {
