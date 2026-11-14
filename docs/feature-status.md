@@ -1,6 +1,6 @@
 # 功能状态表：R01-R27
 
-版本：v1.4.0 / 2026-11-14
+版本：v1.6.0 / 2026-11-15
 状态定义：**已验收**＝当前版本有真实执行证据；**已实现待验收**＝代码完成但未跑对应场景；**部分实现**＝只完成申报切片；**未实现**；**不适用**＝范围表明确允许或明确不启用。未执行不填“通过”。
 
 ## 1. M 必做逐项状态
@@ -26,14 +26,24 @@
 | R17 附件 | M + F | **已验收** | `modules/attachments/routes.ts` | `export-attachment.test.ts`、`f-extensions.test.ts`（PNG/伪装/越权） | PDF/PNG/JPG≤20MB；删除/清理 F 未选做 |
 | R18 导入 | M | **不适用** | 无导入接口；基础数据页面维护 | 范围表 M 允许不提供；README/PRD 说明 | F 导入未选做；不提供空壳 |
 | R19 导出 | M + F | **已验收** | `modules/exports/routes.ts` | `export-attachment.test.ts`、`f-extensions.test.ts`（库存 xlsx） | 订单列表 + 库存台账；其他报表 F 未选做 |
-| R20 通知 | M + F | **已验收** | `common/events.ts`、`modules/notifications/routes.ts`、`reminders.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`、`f-extensions.test.ts` | 关键事件通知；未读一致；7 天/逾期交期提醒每日去重 |
-| R21 看板 | M + v1.4 | **已验收** | `modules/dashboard/routes.ts`、`DashboardPage.tsx`、`FinancePage.tsx` | `notifications-dashboard.test.ts`（状态和=总数）、看板与流水截图 | 真实数据；利润卡可跳转订单流水；空集 0；无虚构效率 |
+| R20 通知 | M + F + v1.6 | **已验收** | `common/events.ts`、`modules/notifications/routes.ts`、`reminders.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`、`notifications-archive.test.ts` | 关键事件通知；未读一致；可删除单条/清理已读；交期提醒每日去重 |
+| R21 看板 | M + v1.4/v1.6 | **已验收** | `modules/dashboard/routes.ts`、`DashboardPage.tsx`、`FinancePage.tsx` | `notifications-dashboard.test.ts`（状态和=总数）、看板与流水截图 | 真实数据；利润卡可跳转订单流水；归档单不计入；空集 0 |
 | R22 异常上报 | M | **已验收** | `modules/exceptions/routes.ts` | `notifications-dashboard.test.ts`（关联、跨部门、不改数量） | 上报/查看；处理状态 F 未启用 |
 | R23 审计 | M | **已验收** | `common/audit.ts`、`modules/audit/routes.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`（脱敏/只读） | 关键写操作 + 失败；管理员检索为 F 切片 |
 | R24 重试与弱网 | M | **已验收** | `frontend/src/lib/api.ts`、`hooks.ts`、各表单 | `network-retry.spec.ts`（结果未知、草稿恢复、同键重试仅一单） | 持久待同步队列 F 未选做；本版本机草稿 |
-| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 49 测试 | 事务/约束/幂等/条件更新；测试见报告 |
+| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 51 测试 | 事务/约束/幂等/条件更新；测试见报告 |
 | R26 环境交付 | M | **已验收** | `config.ts`、`migrate.ts`、`seed.ts`、`scripts/backup|restore` | 干净目录安装/迁移/构建/启动（日志）、备份恢复新实例核对 | 单机；无远程部署 |
 | R27 AI 与文档 | M | **已验收** | PRD/README/AGENTS/CONSTRAINTS/docs/tasks/tests | 文档索引、追溯表、测试报告、AI 说明 | 与当前版本一致；未实现项如实标注 |
+
+## 1.6 v1.6.0 用户追加增强（非原 M）
+
+| 能力 | 状态 | 实现位置 | 证据 |
+| --- | --- | --- | --- |
+| Particular 风格粒子 + 统一 1.1s 特效 | **已验收** | `EffectsLayer.tsx`、`effects.css` | `tests/evidence/e2e/32-fx-particles.png`；动效记录 |
+| 通知删除 / 清理已读 | **已验收** | `notifications/routes.ts`、`NotificationsPage.tsx` | `notifications-archive.test.ts`；`42-notification-delete.png` |
+| 全部订单分页增强（页码/每页条数） | **已验收** | `OrdersPage.tsx` | `41-orders-pagination.png` |
+| 按月归档已完成订单（xlsx/csv） | **已验收** | `archive/service.ts`、`archive/routes.ts` | `notifications-archive.test.ts`；`过去订单/2026-11-已完成订单.xlsx` |
+| 归档后列表隐藏、可切换查看归档 | **已验收** | `orders/routes.ts`、迁移 004 | `45-archived-view.png` |
 
 ## 1.4 v1.4.0 用户追加增强（非原 M）
 

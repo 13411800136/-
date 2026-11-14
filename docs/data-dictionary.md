@@ -1,7 +1,7 @@
 # 数据字典：厂序 FactoryFlow
 
 数据库：SQLite 3（Node `node:sqlite`），文件 `data/factory.db`，WAL。
-迁移：`backend/migrations/001_init.sql`、`002_internal_messages.sql`、`003_orders_customers_batch.sql`（`schema_migrations` 记录校验和）。
+迁移：`backend/migrations/001_init.sql`、`002_internal_messages.sql`、`003_orders_customers_batch.sql`、`004_orders_archive.sql`（`schema_migrations` 记录校验和）。
 类型：金额一律 `INTEGER` 分；事件时间 `TEXT` UTC ISO8601；交期 `TEXT` `YYYY-MM-DD`（北京时间日期语义）；布尔 `INTEGER 0/1`。
 约束：核心表使用 `STRICT`；业务数量 `CHECK > 0`；库存 `CHECK >= 0`；外键 `ON`（RESTRICT/CASCADE 见表）；时间线/审计只追加。
 
@@ -25,7 +25,7 @@
 
 | 表 | 关键字段 | 约束/索引 | 说明 |
 | --- | --- | --- | --- |
-| `orders` | `id`、`order_no`、`customer_id`、`customer_name`、`due_date`、`status`、`note`、`created_by`、`created_at`、`updated_at`、`cancelled_at`、`cancelled_by`、`cancel_reason` | `order_no UNIQUE`；`status CHECK(8 种)`；`(status,created_at)`、客户、交期、`cancelled_at` 索引 | 主键 UUID 与展示号分离；客户名快照；CANCELLED 为派生有效状态 |
+| `orders` | `id`、`order_no`、`customer_id`、`customer_name`、`due_date`、`status`、`note`、`created_by`、`created_at`、`updated_at`、`cancelled_at`、`cancelled_by`、`cancel_reason`、`archived_at` | `order_no UNIQUE`；`status CHECK(8 种)`；`(status,created_at)`、客户、交期、`cancelled_at`、`archived_at` 索引 | 主键 UUID 与展示号分离；客户名快照；CANCELLED 为派生有效状态；`archived_at` 非空表示已归档、默认不出现在列表 |
 | `order_items` | `id`、`order_id`、`part_id`、`product_name`、`spec`、`quantity`、`unit_price_cents`、`created_at` | FK order；`quantity>0`；`unit_price_cents>=0` | M 单明细；产品名/价快照 |
 | `purchase_orders` | `id`、`order_id`、`purchase_no`、`supplier_id`、`supplier_name`、`created_by`、`created_at` | `order_id UNIQUE`（一单一采购单）；`purchase_no UNIQUE` | 供应商快照 |
 | `purchase_items` | `id`、`purchase_order_id`、`part_id`、`part_name`、`spec`、`quantity`、`unit_price_cents`、`created_at` | `purchase_order_id UNIQUE`（M 单配件）；数量/价格 CHECK | 采购价快照 |

@@ -259,7 +259,7 @@ export function AppShell() {
           <Outlet />
         </main>
         <footer className="app-footer">
-          <span>厂序 FactoryFlow · v1.5.0</span>
+          <span>厂序 FactoryFlow · v1.6.0</span>
           <span>业务时区 Asia/Shanghai · 仅合成演示数据</span>
         </footer>
       </div>

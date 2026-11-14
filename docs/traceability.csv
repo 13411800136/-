@@ -1,5 +1,5 @@
 requirement,m_status,implementation,api,tables,tests,result,notes
-R01 身份与会话,已验收,modules/auth/routes.ts; common/auth.ts; common/crypto.ts,POST /auth/login; GET /auth/me; POST /auth/logout,users;sessions;audit_logs,tests/integration/auth.test.ts;master-session.test.ts;tests/e2e/full-flow.spec.ts,49/49 + 2/2 通过,真实会话与角色；停用撤销旧会话
+R01 身份与会话,已验收,modules/auth/routes.ts; common/auth.ts; common/crypto.ts,POST /auth/login; GET /auth/me; POST /auth/logout,users;sessions;audit_logs,tests/integration/auth.test.ts;master-session.test.ts;tests/e2e/full-flow.spec.ts,51/51 + 2/2 通过,真实会话与角色；停用撤销旧会话
 R02 基础数据,已验收,modules/master/routes.ts,GET/POST/PATCH /customers /suppliers /parts /departments /users,users;departments;customers;suppliers;parts,tests/integration/master-session.test.ts,通过,编码唯一；停用不删历史
 R03 业务订单,已验收,modules/orders/routes.ts; orders/service.ts; modules/master/auto-create.ts,GET/POST /orders; GET /orders/:id,orders;order_items;order_timeline;audit_logs,tests/integration/order-flow.test.ts;inline-master-qc-finance.test.ts;tests/e2e/full-flow.spec.ts,通过,单产品；输入新客户/新配件自动建档；无编辑取消
 R04 采购,已验收,modules/purchases/routes.ts,POST /orders/:id/purchase-orders,purchase_orders;purchase_items,tests/integration/order-flow.test.ts,通过,一单一采购单；价格快照
@@ -34,3 +34,7 @@ X03 批量发货,已验收,modules/orders/routes.ts; OrdersPage,POST /orders/bat
 v1.4-1 现场建档,已验收,modules/master/auto-create.ts,POST /orders; POST /orders/:id/purchase-orders,customers;suppliers;parts,tests/integration/inline-master-qc-finance.test.ts,通过,同名不重复建档；编码自动生成；停用客户拒绝
 v1.4-2 质检不合格处置,已验收,modules/qc/routes.ts; production/routes.ts,POST /qc-records/:id/decision,qc_records;production_orders,tests/integration/order-flow.test.ts;inline-master-qc-finance.test.ts,通过,不合格不能 PASS；返工/报废退回；补产容量=订单量+不合格量
 v1.4-3 订单流水,已验收,modules/finance/routes.ts; FinancePage.tsx,GET /finance/summary,orders;order_items;purchase_items;production_feedbacks,tests/integration/inline-master-qc-finance.test.ts;tests/evidence/e2e/26-finance-flow.png,通过,实时汇总；撤销单不计入；仅管理员
+v1.6-1 通知删除,已验收,modules/notifications/routes.ts,DELETE /notifications/:id; POST /notifications/clear-read,notifications,tests/integration/notifications-archive.test.ts,通过,仅本人通知；现场角色 403
+v1.6-2 订单分页,已验收,pages/admin/OrdersPage.tsx,GET /orders?page&pageSize,orders,tests/evidence/e2e/41-orders-pagination.png,通过,页码/每页 10-20-50/首页末页
+v1.6-3 按月归档,已验收,modules/archive/service.ts; archive/routes.ts,POST /orders/archive-month; GET /orders/archive-preview,orders;order_items,notifications-archive.test.ts,通过,先写 xlsx/csv 再标 archived_at；可追溯
+v1.6-4 归档视图,已验收,modules/orders/routes.ts; OrdersPage.tsx,GET /orders?archived=1,orders,tests/evidence/e2e/45-archived-view.png,通过,默认隐藏；勾选查看；看板/流水排除

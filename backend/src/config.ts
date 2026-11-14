@@ -24,6 +24,7 @@ export interface AppConfig {
   logLevel: string;
   projectRoot: string;
   backupDir: string;
+  archiveDir: string;
 }
 
 function bool(value: string | undefined, fallback: boolean): boolean {
@@ -94,7 +95,8 @@ export function loadConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     authPepper: overrides.authPepper ?? loadPepper(nodeEnv),
     logLevel: process.env.LOG_LEVEL ?? (nodeEnv === 'test' ? 'silent' : 'info'),
     projectRoot: PROJECT_ROOT,
-    backupDir: resolvePath(process.env.BACKUP_DIR, 'backups')
+    backupDir: resolvePath(process.env.BACKUP_DIR, 'backups'),
+    archiveDir: resolvePath(process.env.ARCHIVE_DIR, 'archives')
   };
   mkdirSync(dirname(config.databasePath), { recursive: true });
   mkdirSync(config.uploadDir, { recursive: true });

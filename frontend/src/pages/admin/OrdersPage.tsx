@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRight, Download, Filter, Plus, Search, X } from 'lucide-react';
+import { Archive, ArrowRight, Download, Filter, Plus, Search, X } from 'lucide-react';
 import { api, errorMessage } from '../../lib/api';
 import { useAsync, useDocumentTitle, useIntentKey } from '../../lib/hooks';
 import type { OrderListItem, Pagination } from '../../lib/types';
@@ -10,6 +10,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  Modal,
   PageHeader,
   Select,
   StatusPill,
@@ -44,6 +45,13 @@ export function OrdersPage() {
   const [keywordInput, setKeywordInput] = useState('');
   const [keyword, setKeyword] = useState('');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archivePreview, setArchivePreview] = useState<{ month: string; count: number } | null>(null);
+  const [archiveMonth, setArchiveMonth] = useState(previousMonth());
+  const [archiveLoading, setArchiveLoading] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [batching, setBatching] = useState(false);
@@ -51,7 +59,7 @@ export function OrdersPage() {
 
   useEffect(() => {
     setSelected([]);
-  }, [page, status, keyword]);
+  }, [page, pageSize, status, keyword, showArchived]);
 
   useEffect(() => {
     const next = params.get('status') ?? '';
@@ -62,11 +70,11 @@ export function OrdersPage() {
   const { data, loading, error, reload } = useAsync<OrderListResponse>(
     () =>
       api.get(
-        `/orders?page=${page}&pageSize=20${status ? `&status=${encodeURIComponent(status)}` : ''}${
+        `/orders?page=${page}&pageSize=${pageSize}${status ? `&status=${encodeURIComponent(status)}` : ''}${
           keyword ? `&keyword=${encodeURIComponent(keyword)}` : ''
-        }`
+        }${showArchived ? '&archived=1' : ''}`
       ),
-    [page, status, keyword]
+    [page, pageSize, status, keyword, showArchived]
   );
 
   const applySearch = () => {
@@ -102,6 +110,42 @@ export function OrdersPage() {
       toast.error('导出失败', errorMessage(reason));
     } finally {
       setExporting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!archiveOpen) return;
+    setArchiveLoading(true);
+    api
+      .get<{ month: string; count: number }>(`/orders/archive-preview?month=${archiveMonth}`)
+      .then((result) => setArchivePreview({ month: result.month, count: result.count }))
+      .catch((reason) => toast.error('读取归档预览失败', errorMessage(reason)))
+      .finally(() => setArchiveLoading(false));
+  }, [archiveOpen, archiveMonth, toast]);
+
+  const runArchive = async () => {
+    setArchiving(true);
+    try {
+      const result = await api.post<{
+        month: string;
+        count: number;
+        archived: number;
+        xlsxPath: string | null;
+        message?: string;
+      }>('/orders/archive-month', { month: archiveMonth });
+      if (result.archived > 0) {
+        toast.success('归档完成', `${result.month} 共 ${result.archived} 张订单已移出列表，月报写入过去订单目录`);
+      } else {
+        toast.info(result.message ?? '没有可归档的订单');
+      }
+      setArchiveOpen(false);
+      setArchivePreview(null);
+      setPage(1);
+      reload();
+    } catch (reason) {
+      toast.error('归档失败', errorMessage(reason));
+    } finally {
+      setArchiving(false);
     }
   };
 
@@ -159,6 +203,9 @@ export function OrdersPage() {
             <Button variant="secondary" icon={<Download size={16} />} loading={exporting} onClick={() => void exportXlsx()}>
               导出 xlsx
             </Button>
+            <Button variant="ghost" icon={<Archive size={16} />} onClick={() => setArchiveOpen(true)}>
+              归档上月
+            </Button>
             <Button icon={<Plus size={16} />} onClick={() => navigate('/admin/orders/new')}>
               新建订单
             </Button>
@@ -209,10 +256,14 @@ export function OrdersPage() {
             清除筛选
           </button>
         ) : null}
+        <label className="filter-toggle">
+          <input type="checkbox" checked={showArchived} onChange={(event) => { setShowArchived(event.target.checked); setPage(1); }} />
+          查看已归档
+        </label>
         <span className="filter-result">
           {pagination ? (
             <>
-              共 <strong>{pagination.total}</strong> 张订单
+              共 <strong>{pagination.total}</strong> 张{showArchived ? '归档订单' : '订单'}
             </>
           ) : null}
         </span>
@@ -321,8 +372,16 @@ export function OrdersPage() {
               </tbody>
             </table>
           </div>
-          {pagination && pagination.totalPages > 1 ? (
+          {pagination ? (
             <div className="pagination">
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage(1)}
+              >
+                首页
+              </Button>
               <Button
                 variant="secondary"
                 size="sm"
@@ -331,8 +390,23 @@ export function OrdersPage() {
               >
                 上一页
               </Button>
-              <span>
-                第 {pagination.page} / {pagination.totalPages} 页 · 共 {pagination.total} 条
+              <span className="pagination-pages">
+                {pageNumbers(pagination.page, pagination.totalPages).map((value, index) =>
+                  value === null ? (
+                    <span key={`gap-${index}`} className="pagination-gap">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={value}
+                      type="button"
+                      className={value === pagination.page ? 'pagination-page is-current' : 'pagination-page'}
+                      onClick={() => setPage(value)}
+                    >
+                      {value}
+                    </button>
+                  )
+                )}
               </span>
               <Button
                 variant="secondary"
@@ -342,10 +416,117 @@ export function OrdersPage() {
               >
                 下一页
               </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={page >= pagination.totalPages}
+                onClick={() => setPage(pagination.totalPages)}
+              >
+                末页
+              </Button>
+              <span className="pagination-summary">
+                共 {pagination.total} 条 · 第 {pagination.page}/{pagination.totalPages} 页
+              </span>
+              <label className="pagination-size">
+                每页
+                <Select
+                  value={String(pageSize)}
+                  onChange={(event) => {
+                    setPageSize(Number(event.target.value));
+                    setPage(1);
+                  }}
+                  aria-label="每页显示条数"
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                </Select>
+                条
+              </label>
             </div>
           ) : null}
         </>
       )}
+
+      <Modal
+        open={archiveOpen}
+        onClose={() => setArchiveOpen(false)}
+        title="归档上月已完成订单"
+        subtitle="先把月报写入「过去订单」目录，再把订单移出当前列表；数据仍可在归档视图与审计中查询。"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setArchiveOpen(false)}>
+              取消
+            </Button>
+            <Button
+              loading={archiving}
+              disabled={archiveLoading || !archivePreview || archivePreview.count === 0}
+              className="fx-morph"
+              data-fx-particles
+              onClick={() => void runArchive()}
+            >
+              确认归档
+            </Button>
+          </>
+        }
+      >
+        <div className="stack">
+          <label className="archive-month">
+            归档月份
+            <TextInput
+              type="month"
+              value={archiveMonth}
+              max={currentMonth()}
+              onChange={(event) => setArchiveMonth(event.target.value)}
+            />
+          </label>
+          {archiveLoading ? (
+            <p className="muted-note">正在统计该月完成订单…</p>
+          ) : archivePreview ? (
+            <>
+              <p>
+                归档月份：<strong>{archivePreview.month}</strong>
+              </p>
+              <p>
+                可归档已完成订单：<strong>{archivePreview.count}</strong> 张
+              </p>
+              {archivePreview.count === 0 ? (
+                <p className="muted-note">该月没有可归档订单，或已经归档过。</p>
+              ) : (
+                <p className="muted-note">
+                  月报会生成为 <code>{archivePreview.month}-已完成订单.xlsx</code> 与同名 CSV；
+                  归档后这些订单不再出现在「全部订单」，可勾选「查看已归档」查看。
+                </p>
+              )}
+            </>
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
+}
+
+function previousMonth(): string {
+  const now = new Date();
+  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function currentMonth(): string {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function pageNumbers(current: number, total: number): Array<number | null> {
+  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
+  const pages = new Set<number>([1, total, current - 1, current, current + 1]);
+  if (current <= 3) [2, 3, 4].forEach((value) => pages.add(value));
+  if (current >= total - 2) [total - 3, total - 2, total - 1].forEach((value) => pages.add(value));
+  const sorted = [...pages].filter((value) => value >= 1 && value <= total).sort((a, b) => a - b);
+  const result: Array<number | null> = [];
+  sorted.forEach((value, index) => {
+    if (index > 0 && value - sorted[index - 1]! > 1) result.push(null);
+    result.push(value);
+  });
+  return result;
 }

@@ -44,6 +44,7 @@ export async function registerFinanceRoutes(app: FastifyInstance, ctx: AppContex
                         WHERE p.order_id = o.id), 0) AS production_cents
        FROM orders o
        JOIN order_items oi ON oi.order_id = o.id
+       WHERE o.archived_at IS NULL
        ORDER BY o.created_at DESC, o.id DESC`
     );
 

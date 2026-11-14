@@ -34,7 +34,8 @@ export async function createTestEnv(
     demoMode: true,
     sessionTtlHours: 1,
     appOrigins: ['http://localhost'],
-    maxUploadBytes: options.maxUploadBytes ?? 5 * 1024 * 1024
+    maxUploadBytes: options.maxUploadBytes ?? 5 * 1024 * 1024,
+    archiveDir: join(dir, 'archives')
   });
   mkdirSync(config.uploadDir, { recursive: true });
   const db = new AppDatabase(config.databasePath);

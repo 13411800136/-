@@ -38,3 +38,6 @@ restore-server.*.log
 Thumbs.db
 .idea/
 .vscode/
+
+# 归档月报（运行产物）
+archives/

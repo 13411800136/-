@@ -87,6 +87,39 @@ export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppC
     return ok(reply, request, { id, read: true, unreadCount: unread?.count ?? 0 });
   });
 
+  app.delete('/notifications/:id', admin, async (request, reply) => {
+    const { id } = validate(idParam, request.params);
+    const actor = request.auth!.user;
+    const notification = db.get<{ id: string; recipient_id: string }>(
+      'SELECT id, recipient_id FROM notifications WHERE id = ?',
+      id
+    );
+    if (!notification) throw errors.notFound('通知不存在');
+    if (notification.recipient_id !== actor.id) throw errors.forbidden('不能删除其他人的通知');
+    db.run('DELETE FROM notifications WHERE id = ? AND recipient_id = ?', id, actor.id);
+    const unread = db.get<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL',
+      actor.id
+    );
+    return ok(reply, request, { id, deleted: true, unreadCount: unread?.count ?? 0 });
+  });
+
+  app.post('/notifications/clear-read', admin, async (request, reply) => {
+    const actor = request.auth!.user;
+    const result = db.run(
+      'DELETE FROM notifications WHERE recipient_id = ? AND read_at IS NOT NULL',
+      actor.id
+    );
+    const unread = db.get<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL',
+      actor.id
+    );
+    return ok(reply, request, {
+      deleted: Number(result.changes),
+      unreadCount: unread?.count ?? 0
+    });
+  });
+
   app.post('/notifications/mark-all-read', admin, async (request, reply) => {
     const actor = request.auth!.user;
     const updated = db.run(

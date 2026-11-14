@@ -66,10 +66,10 @@ interface Summary {
 
 function buildSummary(db: AppContext['db'], adminId: string): Summary {
   const statusRows = db.all<{ status: OrderStatus; count: number }>(
-    'SELECT status, COUNT(*) AS count FROM orders WHERE cancelled_at IS NULL GROUP BY status'
+    'SELECT status, COUNT(*) AS count FROM orders WHERE cancelled_at IS NULL AND archived_at IS NULL GROUP BY status'
   );
   const cancelledRow = db.get<{ count: number }>(
-    'SELECT COUNT(*) AS count FROM orders WHERE cancelled_at IS NOT NULL'
+    'SELECT COUNT(*) AS count FROM orders WHERE cancelled_at IS NOT NULL AND archived_at IS NULL'
   );
   const statusCounts = (Object.keys(ORDER_STATUS_LABELS) as OrderStatus[]).map((status) => ({
     status,
@@ -84,17 +84,17 @@ function buildSummary(db: AppContext['db'], adminId: string): Summary {
 
   const sales = db.get<{ cents: number }>(
     `SELECT COALESCE(SUM(oi.quantity * oi.unit_price_cents), 0) AS cents
-     FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.cancelled_at IS NULL`
+     FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.cancelled_at IS NULL AND o.archived_at IS NULL`
   );
   const purchase = db.get<{ cents: number }>(
     `SELECT COALESCE(SUM(pi.quantity * pi.unit_price_cents), 0) AS cents
      FROM purchase_items pi JOIN purchase_orders po ON po.id = pi.purchase_order_id
-     JOIN orders o ON o.id = po.order_id WHERE o.cancelled_at IS NULL`
+     JOIN orders o ON o.id = po.order_id WHERE o.cancelled_at IS NULL AND o.archived_at IS NULL`
   );
   const production = db.get<{ cents: number }>(
     `SELECT COALESCE(SUM(f.quantity * p.unit_price_cents), 0) AS cents
      FROM production_feedbacks f JOIN production_orders p ON p.id = f.production_order_id
-     JOIN orders o ON o.id = p.order_id WHERE o.cancelled_at IS NULL`
+     JOIN orders o ON o.id = p.order_id WHERE o.cancelled_at IS NULL AND o.archived_at IS NULL`
   );
   const profit = computeProfit({
     salesCents: sales?.cents ?? 0,
@@ -120,7 +120,7 @@ function buildSummary(db: AppContext['db'], adminId: string): Summary {
      JOIN orders o ON o.id = p.order_id
      JOIN order_items oi ON oi.id = p.order_item_id
      JOIN departments d ON d.id = p.department_id
-     WHERE o.cancelled_at IS NULL AND o.status IN ('IN_PRODUCTION', 'PENDING_QC')
+     WHERE o.cancelled_at IS NULL AND o.archived_at IS NULL AND o.status IN ('IN_PRODUCTION', 'PENDING_QC')
      ORDER BY o.due_date`
   );
   const completedTaskCount = db.get<{ count: number }>(

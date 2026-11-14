@@ -1,6 +1,6 @@
 # API 合同：厂序 FactoryFlow
 
-版本：v1.4.0（2026-11-14）
+版本：v1.6.0（2026-11-15）
 前缀：`/api/v1`；Content-Type：`application/json`（附件上传为 multipart，导出为 xlsx）。
 成功：`{ "data": ..., "requestId": "..." }`；失败：`{ "error": { "code": "...", "message": "...", "details": ... }, "requestId": "..." }`。
 
@@ -48,7 +48,9 @@
 
 | 方法/路径 | 角色 | 说明 | 幂等 |
 | --- | --- | --- | --- |
-| `GET /orders` | ADMIN | 列表；`status`、`keyword`、分页 | — |
+| `GET /orders` | ADMIN | 列表；`status`、`keyword`、分页；`archived=1` 查看归档单 | — |
+| `GET /orders/archive-preview` | ADMIN | 预览某月可归档已完成订单 | — |
+| `POST /orders/archive-month` | ADMIN | 写月报 xlsx/csv 到 ARCHIVE_DIR，再标记 archived_at | 必需 |
 | `POST /orders` | ADMIN | 建单（单明细）；`customerId` 或 `customerName`、`item.partId` 或 `item.partName` 二选一；订单号后端生成 | 必需 |
 | `GET /orders/:id` | ADMIN | 详情 + summary + profit + stages | — |
 | `GET /orders/:id/timeline` | ADMIN | 时间线事件 | — |
@@ -142,6 +144,8 @@
 | `GET /notifications/unread-count` | ADMIN | 未读数 |
 | `POST /notifications/:id/read` | ADMIN | 只能操作自己的通知 |
 | `POST /notifications/mark-all-read` | ADMIN | 全部已读（F 切片） |
+| `DELETE /notifications/:id` | ADMIN | 删除自己的单条通知 |
+| `POST /notifications/clear-read` | ADMIN | 清理全部已读通知 |
 | `GET /dashboard/summary` | ADMIN | 状态/生产/利润/临期/库存/最近订单 |
 | `GET /dashboard/order-stats` | ADMIN | 状态计数 |
 | `GET /dashboard/profit-stats` | ADMIN | 利润汇总 |

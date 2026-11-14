@@ -72,7 +72,8 @@ const listQuery = pageQuery.extend({
       'CANCELLED'
     ])
     .optional(),
-  keyword: z.string().trim().max(80).optional()
+  keyword: z.string().trim().max(80).optional(),
+  archived: z.enum(['0', '1']).optional()
 });
 
 const cancelSchema = z.object({
@@ -96,6 +97,8 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
     const query = validate(listQuery, request.query);
     const where: string[] = [];
     const params: Array<string | number> = [];
+    // 归档订单默认不出现；显式 archived=1 时才查看历史归档
+    where.push(query.archived === '1' ? 'o.archived_at IS NOT NULL' : 'o.archived_at IS NULL');
     if (query.status === 'CANCELLED') {
       where.push('o.cancelled_at IS NOT NULL');
     } else if (query.status) {

@@ -1126,6 +1126,112 @@ th.num {
   margin-left: 8px;
 }
 
+/* ---------- 分页与归档筛选 ---------- */
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 2px;
+  border-top: 1px dashed var(--line);
+  margin-top: 10px;
+}
+
+.pagination-pages {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pagination-page {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--muted);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.pagination-page:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.pagination-page.is-current {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.pagination-gap {
+  color: var(--faint);
+  padding: 0 2px;
+}
+
+.pagination-summary {
+  color: var(--faint);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.pagination-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  margin-left: auto;
+  color: var(--faint);
+  font-size: 10.5px;
+}
+
+.pagination-size select {
+  height: 26px;
+  padding: 0 4px;
+  font-size: 11px;
+}
+
+.filter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.filter-toggle input {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--ink);
+}
+
+.text-link-danger {
+  color: var(--danger);
+}
+
+.text-link-danger:hover {
+  color: var(--danger);
+  text-decoration-color: var(--danger);
+}
+
+.archive-month {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.archive-month input {
+  width: 150px;
+}
+
 /* 处置选项：选中用墨色描边 + 纸面，避免与整站色板冲突 */
 .decision-option {
   border-radius: 2px;

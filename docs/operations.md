@@ -28,6 +28,11 @@ npm start
 
 ## 3. 启动与停止
 
+### 归档目录
+
+- `ARCHIVE_DIR`（默认 `archives/`）：已完成订单月报写入位置。本机演示在 `.env` 指向 `C:\\Users\\33562\\Desktop\\personalproduct\\考核文件\\过去订单`。
+- 归档文件：`YYYY-MM-已完成订单.xlsx` 与同名 `.csv`；重复归档同月会覆盖同名文件，但只处理尚未归档的订单。
+
 ### 单进程（推荐）
 
 ```powershell

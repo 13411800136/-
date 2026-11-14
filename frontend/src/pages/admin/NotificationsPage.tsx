@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CheckCheck, Circle } from 'lucide-react';
+import { Trash2, Bell, CheckCheck, Circle } from 'lucide-react';
 import { api, errorMessage } from '../../lib/api';
 import { fmtDateTime } from '../../lib/format';
 import { useAsync, useDocumentTitle } from '../../lib/hooks';
@@ -59,6 +59,28 @@ export function NotificationsPage() {
     }
   };
 
+  const remove = async (item: NotificationItem) => {
+    try {
+      await api.delete(`/notifications/${item.id}`);
+      toast.success('通知已删除');
+      notifications.reload();
+      notifyShell();
+    } catch (reason) {
+      toast.error('删除失败', errorMessage(reason));
+    }
+  };
+
+  const clearRead = async () => {
+    try {
+      const result = await api.post<{ deleted: number }>('/notifications/clear-read', {});
+      toast.success('已清理已读通知', `删除 ${result.deleted} 条`);
+      notifications.reload();
+      notifyShell();
+    } catch (reason) {
+      toast.error('清理失败', errorMessage(reason));
+    }
+  };
+
   const items = notifications.data?.items ?? [];
 
   return (
@@ -68,9 +90,19 @@ export function NotificationsPage() {
         title="通知中心"
         description="关键业务事件持久保存；同一事件重放不会重复生成。未读数量与列表使用同一数据源。"
         actions={
-          <Button variant="secondary" icon={<CheckCheck size={16} />} onClick={() => void markAll()} disabled={!notifications.data?.unreadCount}>
-            全部已读
-          </Button>
+          <div className="header-actions fx-stagger">
+            <Button variant="secondary" icon={<CheckCheck size={16} />} onClick={() => void markAll()} disabled={!notifications.data?.unreadCount}>
+              全部已读
+            </Button>
+            <Button
+              variant="ghost"
+              icon={<Trash2 size={16} />}
+              onClick={() => void clearRead()}
+              disabled={items.every((item) => !item.read)}
+            >
+              清理已读
+            </Button>
+          </div>
         }
       />
 
@@ -130,6 +162,13 @@ export function NotificationsPage() {
                   ) : (
                     <span className="read-label">已读</span>
                   )}
+                  <button
+                    type="button"
+                    className="text-link text-link-danger"
+                    onClick={() => void remove(item)}
+                  >
+                    删除
+                  </button>
                 </div>
               </div>
             </article>

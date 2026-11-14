@@ -48,6 +48,8 @@
 | 批量确认发货 | 仅 ADMIN；逐单校验 PACKING、包装量≥订单量；任一失败整批不执行 | `orders/routes.ts` |
 | 库存导出 | 仅 ADMIN；xlsx 文件 | `exports/routes.ts` |
 | 订单流水 | 仅 ADMIN；只读实时汇总 | `finance/routes.ts` |
+| 订单归档 | 仅 ADMIN；写月报文件并标记 archived_at | `archive/routes.ts` |
+| 通知删除 | 仅 ADMIN 且只能删除自己的通知 | `notifications/routes.ts` |
 | 附件 | 管理员；订单必须存在；下载按附件 ID + 存储键，不暴露本地路径 | `attachments/routes.ts` |
 | 订单导出 | 管理员；筛选条件由服务端重新执行 | `exports/routes.ts` |
 | 库存 | 管理员；来源订单若提供必须存在 | `inventory/routes.ts` |
