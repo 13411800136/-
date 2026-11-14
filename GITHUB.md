@@ -78,8 +78,8 @@ npm start
 
 - 仓库：<https://github.com/13411800136/->
 - 远程仓库原本只有占位 README（`5af57be`）；已合并两边历史并保留项目说明。
-- `main` 已推送，提交 `5adf563`；`v1.3.0` 标签已推送。
-- GitHub Actions `CI` 首次运行（run #1）结果为 **success**。
+- `main` 已推送，最新提交 `3488e48`；`v1.3.0` 标签已推送。
+- GitHub Actions `CI`：run #1（`5adf563`）与 run #2（`3488e48`）均为 **success**。
 - 仓库当前为 Public；根目录没有 `LICENSE`，公开状态由作者决定。
 - 没有上传运行数据库、附件、`.env` 或 `.auth-secret`。
 - E2E 未放入 CI（需要浏览器），仍按 README 在本机执行。

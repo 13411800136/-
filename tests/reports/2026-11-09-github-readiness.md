@@ -57,9 +57,9 @@ node scripts/restore.mjs --backup <backup-dir> --to <new-dir>
 ## 4. 实际上传结果（2026-11-14）
 
 - 仓库：<https://github.com/13411800136/->
-- 远程原始占位 README 提交 `5af57be` 已合并，项目 `main` 推送为 `5adf563`。
-- 标签 `v1.3.0` 已推送。
-- GitHub Actions `CI` run #1：**success**（Node 24，安装/类型检查/44 测试/构建）。
+- 远程原始占位 README 提交 `5af57be` 已合并；`main` 当前为 `3488e48`。
+- 标签 `v1.3.0` 已推送（指向 `59c4427`）。
+- GitHub Actions `CI`：run #1（`5adf563`）、run #2（`3488e48`）均为 **success**（Node 24，安装/类型检查/44 测试/构建）。
 - 仓库当前 Public；没有选择开源许可证，根目录无 `LICENSE`。
 
 ## 5. 未执行 / 已知限制
