@@ -214,8 +214,8 @@ export function OrderDetailPage() {
             {item?.spec ? ` / ${item.spec}` : ''} · {item?.quantity ?? 0} 件 · 创建于 {fmtDateTime(order.createdAt)}
           </p>
         </div>
-        <div className="order-head-actions">
-          <Button variant="ghost" size="sm" icon={<RefreshCw size={14} />} onClick={refreshAll}>
+        <div className="order-head-actions fx-stagger">
+          <Button variant="ghost" size="sm" icon={<RefreshCw size={14} />} className="fx-mask" onClick={refreshAll}>
             刷新
           </Button>
           {summary.canCancel ? (
@@ -223,6 +223,7 @@ export function OrderDetailPage() {
               variant="secondary"
               size="sm"
               icon={<AlertTriangle size={14} />}
+              className="fx-glitch"
               onClick={() => setModal({ type: 'cancelOrder' })}
             >
               撤销订单
@@ -230,7 +231,7 @@ export function OrderDetailPage() {
           ) : null}
           {waitingText ? <span className="waiting-chip">{waitingText}</span> : null}
           {adminAction ? (
-            <Button icon={adminAction.icon} onClick={adminAction.onClick}>
+            <Button icon={adminAction.icon} className="fx-particles" data-fx-particles onClick={adminAction.onClick}>
               {adminAction.label}
             </Button>
           ) : order.status === 'COMPLETED' ? (

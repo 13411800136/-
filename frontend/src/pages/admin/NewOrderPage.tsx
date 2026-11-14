@@ -349,7 +349,13 @@ export function NewOrderPage() {
             <Button type="button" variant="ghost" onClick={() => navigate('/admin/orders')}>
               取消
             </Button>
-            <Button type="submit" loading={submitting} icon={<ClipboardCheck size={16} />}>
+            <Button
+              type="submit"
+              loading={submitting}
+              icon={<ClipboardCheck size={16} />}
+              className="fx-morph"
+              data-fx-particles
+            >
               保存订单
             </Button>
           </div>

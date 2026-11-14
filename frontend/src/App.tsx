@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes, Link } from 'react-router-dom';
 import { AuthProvider, homeForRole, useAuth } from './app/AuthContext';
 import { GuestRoute, ProtectedRoute } from './app/ProtectedRoute';
 import { AppShell } from './app/AppShell';
+import { EffectsLayer } from './app/EffectsLayer';
 import { ToastProvider } from './components/Toast';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/admin/DashboardPage';
@@ -190,6 +191,7 @@ export function App() {
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          <EffectsLayer />
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

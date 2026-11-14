@@ -264,7 +264,13 @@ function QcForm({ task, onDone }: { task: QcTask; onDone: () => void }) {
           maxLength={200}
         />
       </Field>
-      <Button onClick={() => void submit()} loading={submitting} icon={unknown ? <RefreshCw size={15} /> : <ShieldCheck size={15} />}>
+      <Button
+        onClick={() => void submit()}
+        loading={submitting}
+        className="fx-mask fx-parallax"
+        data-fx-particles
+        icon={unknown ? <RefreshCw size={15} /> : <ShieldCheck size={15} />}
+      >
         {unknown ? '重试原请求' : badCount > 0 ? '上报不合格并提交' : '确认全检合格并提交'}
       </Button>
     </div>

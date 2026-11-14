@@ -166,7 +166,13 @@ export function LoginPage() {
               </div>
             </label>
             {error ? <div className="login-error">{error}</div> : null}
-            <Button type="submit" size="lg" loading={loading} className="login-submit">
+            <Button
+            type="submit"
+            size="lg"
+            loading={loading}
+            className="login-submit fx-mask fx-parallax"
+            data-fx-particles
+          >
               登录系统 <ArrowRight size={17} />
             </Button>
           </form>

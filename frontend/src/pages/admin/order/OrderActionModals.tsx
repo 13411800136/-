@@ -154,7 +154,7 @@ export function PurchaseModal({
           <Button variant="ghost" onClick={onClose}>
             取消
           </Button>
-          <Button loading={action.submitting} onClick={submit}>
+          <Button loading={action.submitting} className="fx-mask fx-parallax" data-fx-particles onClick={submit}>
             保存采购单
           </Button>
         </>
@@ -550,6 +550,8 @@ export function QcDecisionModal({
           <Button
             loading={action.submitting}
             onClick={submit}
+            className={decision === 'PASS' ? 'fx-particles' : 'fx-glitch fx-particles'}
+            data-fx-particles
             variant={decision === 'PASS' ? 'primary' : 'danger'}
             icon={decision === 'PASS' ? <CheckCircle2 size={16} /> : <RotateCw size={16} />}
           >

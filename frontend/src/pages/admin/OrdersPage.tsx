@@ -223,7 +223,7 @@ export function OrdersPage() {
           <span>
             已选择 <strong>{selected.length}</strong> 张包装中的订单
           </span>
-          <Button size="sm" variant="dark" loading={batching} onClick={() => void batchConfirmShipment()}>
+          <Button size="sm" variant="dark" loading={batching} className="fx-morph" data-fx-particles onClick={() => void batchConfirmShipment()}>
             批量确认发货
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setSelected([])}>

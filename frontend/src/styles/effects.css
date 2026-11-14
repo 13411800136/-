@@ -1,0 +1,282 @@
+/* ============================================================
+   按钮特效层（v1.5）
+   七种效果：挤压 / 交错 / 形变 / 故障 / 视差 / 粒子 / 遮罩揭示
+   仅视觉，不改变布局与点击区域；减少动态偏好下全部关闭。
+   ============================================================ */
+
+.fx-particle-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+
+/* ---------- 1. 挤压：按下时纵向压缩、横向微扩 ---------- */
+
+.btn {
+  transform-origin: center;
+  transition:
+    transform 0.16s cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 0.16s ease,
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.965, 0.93);
+  box-shadow: none;
+}
+
+.btn-ghost:active:not(:disabled),
+.btn-secondary:active:not(:disabled) {
+  transform: translateY(1px) scale(0.975, 0.95);
+}
+
+/* ---------- 2. 遮罩揭示：墨色从左向右刷过 ---------- */
+
+.fx-mask {
+  background-image: linear-gradient(var(--ink), var(--ink));
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: 0% 100%;
+  transition:
+    background-size 0.42s cubic-bezier(0.65, 0, 0.35, 1),
+    color 0.28s ease,
+    border-color 0.28s ease;
+}
+
+.fx-mask:hover:not(:disabled),
+.fx-mask:focus-visible {
+  background-image: linear-gradient(var(--ink), var(--ink));
+  background-size: 100% 100%;
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* 主按钮/深色按钮用信号色刷过，文字回到墨色 */
+.fx-mask.btn-dark,
+.fx-mask.btn-primary {
+  background-image: linear-gradient(var(--signal), var(--signal));
+}
+
+.fx-mask.btn-dark:hover:not(:disabled),
+.fx-mask.btn-primary:hover:not(:disabled),
+.fx-mask.btn-dark:focus-visible,
+.fx-mask.btn-primary:focus-visible {
+  background-image: linear-gradient(var(--signal), var(--signal));
+  background-size: 100% 100%;
+  color: var(--ink);
+  border-color: var(--signal);
+}
+
+/* ---------- 3. 形变：切角轮廓在悬停时收束 ---------- */
+
+.fx-morph {
+  position: relative;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+  transition:
+    clip-path 0.36s cubic-bezier(0.65, 0, 0.35, 1),
+    transform 0.36s cubic-bezier(0.65, 0, 0.35, 1),
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.fx-morph:hover:not(:disabled) {
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+
+.fx-morph svg {
+  transition: transform 0.36s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.fx-morph:hover:not(:disabled) svg {
+  transform: rotate(-90deg) scale(0.86);
+}
+
+.fx-morph:active:not(:disabled) {
+  transform: scale(0.97, 0.94);
+}
+
+/* ---------- 4. 故障：悬停时文字错位、扫描线抖动 ---------- */
+
+.fx-glitch {
+  position: relative;
+}
+
+.fx-glitch:hover:not(:disabled) {
+  animation: fx-glitch-shake 0.4s steps(2, end) 2;
+  text-shadow:
+    -1.5px 0 rgba(221, 159, 34, 0.85),
+    1.5px 0 rgba(17, 22, 20, 0.55);
+}
+
+.fx-glitch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    linear-gradient(var(--signal), var(--signal)) 0 32% / 100% 1px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) 0 68% / 100% 1px no-repeat;
+}
+
+.fx-glitch:hover:not(:disabled)::after {
+  opacity: 1;
+  animation: fx-glitch-tear 0.4s steps(2, end) 2;
+}
+
+@keyframes fx-glitch-shake {
+  0%,
+  100% {
+    transform: translateX(0) skewX(0);
+  }
+  25% {
+    transform: translateX(-1px) skewX(-1deg);
+  }
+  50% {
+    transform: translateX(1.5px) skewX(0.8deg);
+  }
+  75% {
+    transform: translateX(-0.5px) skewX(0);
+  }
+}
+
+@keyframes fx-glitch-tear {
+  0% {
+    transform: translateY(-3px) scaleX(1);
+    clip-path: inset(0 0 88% 0);
+  }
+  50% {
+    transform: translateY(2px) scaleX(1.01);
+    clip-path: inset(60% 0 0 0);
+  }
+  100% {
+    transform: translateY(-3px) scaleX(1);
+    clip-path: inset(0 0 88% 0);
+  }
+}
+
+/* ---------- 5. 视差：图标与文字按指针位移 ---------- */
+
+.fx-parallax {
+  --fx-px: 0;
+  --fx-py: 0;
+  position: relative;
+  isolation: isolate;
+}
+
+.fx-parallax > svg {
+  transform: translate3d(calc(var(--fx-px) * 2.4px), calc(var(--fx-py) * 2.4px), 0);
+  transition: transform 0.12s ease-out;
+}
+
+.fx-parallax::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    120px circle at calc(50% + var(--fx-px) * 40%) calc(50% + var(--fx-py) * 40%),
+    rgba(221, 159, 34, 0.16),
+    transparent 62%
+  );
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.fx-parallax:hover::after {
+  opacity: 1;
+}
+
+/* ---------- 6. 交错：整组按钮依次入场 / 悬停波浪 ---------- */
+
+.fx-stagger > .btn {
+  animation: fx-stagger-in 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.fx-stagger > .btn:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.fx-stagger > .btn:nth-child(2) {
+  animation-delay: 0.08s;
+}
+.fx-stagger > .btn:nth-child(3) {
+  animation-delay: 0.14s;
+}
+.fx-stagger > .btn:nth-child(4) {
+  animation-delay: 0.2s;
+}
+.fx-stagger > .btn:nth-child(5) {
+  animation-delay: 0.26s;
+}
+
+.fx-stagger:hover > .btn {
+  transform: translateY(-1px);
+}
+
+.fx-stagger > .btn:nth-child(1) {
+  transition-delay: 0s;
+}
+.fx-stagger > .btn:nth-child(2) {
+  transition-delay: 0.04s;
+}
+.fx-stagger > .btn:nth-child(3) {
+  transition-delay: 0.08s;
+}
+.fx-stagger > .btn:nth-child(4) {
+  transition-delay: 0.12s;
+}
+
+@keyframes fx-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- 7. 粒子：点击时从按钮中心散开（canvas 绘制） ---------- */
+
+[data-fx-particles] {
+  position: relative;
+}
+
+/* ---------- 降级：减少动态 ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .fx-morph,
+  .fx-parallax > svg,
+  .fx-mask::before {
+    transition: none !important;
+  }
+
+  .btn:active:not(:disabled),
+  .fx-morph:active:not(:disabled),
+  .fx-stagger:hover > .btn {
+    transform: none !important;
+  }
+
+  .fx-stagger > .btn {
+    animation: none !important;
+  }
+
+  .fx-glitch:hover:not(:disabled)::after,
+  .fx-glitch:hover:not(:disabled) {
+    animation: none !important;
+  }
+
+  .fx-parallax::after {
+    display: none;
+  }
+
+  .fx-particle-layer {
+    display: none;
+  }
+}

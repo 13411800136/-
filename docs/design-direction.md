@@ -1,7 +1,7 @@
 # 设计方向：工位轨道（Station Rail）
 
 - 日期：2026-11-14
-- 适用版本：v1.3.1 视觉层（`frontend/src/styles/line-theme.css`）
+- 适用版本：v1.3.1 视觉层（`frontend/src/styles/line-theme.css`）；v1.5.0 动效层（`frontend/src/styles/effects.css` + `EffectsLayer.tsx`）
 - 方法来源：`houxin0010/distinctive-ai-design` 的「探索 → 定义 → 交付」流程
 
 ## 三个候选方向
@@ -40,6 +40,24 @@
 | 每屏一个墨色锚点 | `.profit-card`、`.profit-panel-card` |
 | 主操作收束：空状态按钮降级为文字链 | `.empty-state .btn` |
 | 登录页：蓝图网格 + 轨道 + 合成环境标注 | `.login-*` |
+
+## 按钮动效层（v1.5.0）
+
+七种效果按“工位动作”的语义分配，不做无差别堆叠：
+
+| 效果 | 类名 / 机制 | 用在哪 | 为什么 |
+| --- | --- | --- | --- |
+| 挤压 | `.btn:active` | 全部按钮 | 按下像按到实体键，给触觉替代反馈 |
+| 交错 | `.fx-stagger` | 看板头区、订单详情头区 | 一组动作按工序顺序出现，视线有落点 |
+| 形变 | `.fx-morph` | 保存订单、批量确认发货、质检提交 | 提交动作“变形”为推进，暗示状态改变 |
+| 故障 | `.fx-glitch` | 撤销订单、确认报废 | 不可逆/破坏性动作的视觉警告，不是装饰 |
+| 视差 | `.fx-parallax` | 登录、采购保存、质检提交 | 指针在按钮内移动，图标与光斑分层 |
+| 粒子 | `data-fx-particles` + canvas | 登录、保存订单、主操作、处置确认 | 落子即“动作完成”的一次性确认 |
+| 遮罩揭示 | `.fx-mask` | 登录、刷新、采购保存、质检提交 | 墨色/信号色从左刷过，与纸面+墨块语言一致 |
+
+- 粒子层挂在 `App` 根部，`pointer-events: none`，只在点击瞬间存在约 0.7s。
+- 所有效果在 `prefers-reduced-motion: reduce` 下关闭；按钮的点击区域、Tab 顺序与对比度不受影响。
+- 回退：删除 `frontend/src/styles/effects.css` 的引入与 `App.tsx` 中的 `<EffectsLayer />` 即可，业务代码不需要改。
 
 ## 独立评审结论（2026-11-14，基于真实截图）
 

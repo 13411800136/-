@@ -72,14 +72,14 @@ export function DashboardPage() {
           </>
         }
         actions={
-          <>
+          <div className="header-actions fx-stagger">
             <Button variant="secondary" icon={<ClipboardList size={16} />} onClick={() => navigate('/admin/orders')}>
               全部订单
             </Button>
             <Button icon={<Plus size={16} />} onClick={() => navigate('/admin/orders/new')}>
               新建订单
             </Button>
-          </>
+          </div>
         }
       />
 
