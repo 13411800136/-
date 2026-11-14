@@ -116,10 +116,37 @@ test('按月归档：生成 xlsx/csv，订单移出默认列表但可查归档�
   const detail = await call(env.app, admin, 'GET', `/orders/${orderId}`);
   assert.equal(detail.statusCode, 200, '归档后详情仍可追溯');
 
-  // 重复归档：没有新订单可归档
+  // 重复归档：没有新订单可归档，但月报仍按全量刷新
   const repeat = await call(env.app, admin, 'POST', '/orders/archive-month', { month }, key('archive-2'));
   assert.equal(repeat.statusCode, 200);
   assert.equal(repeat.json().data.archived, 0);
+  assert.equal(repeat.json().data.count, 1);
+
+  // 同月新增一张已完成订单后再归档：月报应包含两张，旧行不能被覆盖
+  const secondId = crypto.randomUUID();
+  env.db.run(
+    `INSERT INTO orders(id, order_no, customer_id, customer_name, due_date, status, note, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, '归档客户二号', ?, 'COMPLETED', '', (SELECT id FROM users WHERE username = 'admin'), ?, ?)`,
+    secondId,
+    'SO-ARCHIVE-TEST-002',
+    ids.customerId,
+    futureDate(1),
+    completedAt,
+    completedAt
+  );
+  env.db.run(
+    `INSERT INTO order_items(id, order_id, part_id, product_name, spec, quantity, unit_price_cents, created_at)
+     VALUES (?, ?, NULL, '归档产品二', 'AR-2', 4, 500, ?)`,
+    crypto.randomUUID(),
+    secondId,
+    completedAt
+  );
+  const second = await call(env.app, admin, 'POST', '/orders/archive-month', { month }, key('archive-3'));
+  assert.equal(second.statusCode, 200, second.body);
+  assert.equal(second.json().data.archived, 1);
+  const csv = readFileSync(csvPath, 'utf8');
+  assert.match(csv, /SO-ARCHIVE-TEST-001/);
+  assert.match(csv, /SO-ARCHIVE-TEST-002/);
 
   const rejected = await call(env.app, admin, 'POST', '/orders/archive-month', { month: '2026-13' });
   assert.equal(rejected.statusCode, 400);

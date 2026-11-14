@@ -55,7 +55,8 @@ function monthRange(month: string): { startIso: string; endIso: string } {
 
 export function loadMonthlyCompletedOrders(
   db: AppDatabase,
-  month: string
+  month: string,
+  includeArchived = false
 ): MonthlyArchiveRow[] {
   const { startIso, endIso } = monthRange(month);
   return db.all<MonthlyArchiveRow>(
@@ -76,7 +77,8 @@ export function loadMonthlyCompletedOrders(
                       WHERE p.order_id = o.id), 0) AS production_cents
      FROM orders o
      JOIN order_items oi ON oi.order_id = o.id
-     WHERE o.status = 'COMPLETED' AND o.cancelled_at IS NULL AND o.archived_at IS NULL
+     WHERE o.status = 'COMPLETED' AND o.cancelled_at IS NULL
+       AND (${includeArchived ? '1 = 1' : 'o.archived_at IS NULL'})
        AND COALESCE(
              (SELECT MAX(s.created_at) FROM shipment_records s WHERE s.order_id = o.id),
              o.updated_at

@@ -37,18 +37,31 @@ export async function registerArchiveRoutes(app: FastifyInstance, ctx: AppContex
     if (!isValidMonth(month)) throw errors.validation('月份格式应为 YYYY-MM');
 
     const rows = loadMonthlyCompletedOrders(db, month);
-    if (rows.length === 0) {
+    const allRows = loadMonthlyCompletedOrders(db, month, true);
+    if (allRows.length === 0) {
       return ok(reply, request, {
         month,
         count: 0,
         archived: 0,
-        message: '该月没有待归档的已完成订单',
+        message: '该月没有已完成订单',
         xlsxPath: null,
         csvPath: null
       });
     }
 
-    const archive = await writeMonthlyArchive(db, config.archiveDir, month, rows);
+    // 月报始终覆盖为该月全量（含此前已归档），避免同月多次归档把旧行覆盖掉
+    const archive = await writeMonthlyArchive(db, config.archiveDir, month, allRows);
+    if (rows.length === 0) {
+      return ok(reply, request, {
+        month,
+        count: allRows.length,
+        archived: 0,
+        message: '该月订单已全部归档，月报已按全量刷新',
+        xlsxPath: archive.xlsxPath,
+        csvPath: archive.csvPath,
+        totals: archive.totals
+      });
+    }
     const now = nowIso();
     const archived = db.tx(() => {
       let changed = 0;
@@ -82,7 +95,7 @@ export async function registerArchiveRoutes(app: FastifyInstance, ctx: AppContex
 
     return ok(reply, request, {
       month,
-      count: rows.length,
+      count: allRows.length,
       archived,
       xlsxPath: archive.xlsxPath,
       csvPath: archive.csvPath,
