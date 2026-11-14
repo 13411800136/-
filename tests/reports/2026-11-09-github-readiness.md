@@ -54,10 +54,17 @@ node scripts/restore.mjs --backup <backup-dir> --to <new-dir>
 - 恢复：`integrity=ok`，migrations 为 001/002/003，附件校验 0 个
 - 恢复目录为新目录，未覆盖运行库
 
-## 4. 未执行 / 已知限制
+## 4. 实际上传结果（2026-11-14）
 
-- **没有执行 `git push`**：尚未提供 GitHub 远程地址；上传命令见 `GITHUB.md`。
-- 没有创建 GitHub 仓库、没有选择开源许可证。
+- 仓库：<https://github.com/13411800136/->
+- 远程原始占位 README 提交 `5af57be` 已合并，项目 `main` 推送为 `5adf563`。
+- 标签 `v1.3.0` 已推送。
+- GitHub Actions `CI` run #1：**success**（Node 24，安装/类型检查/44 测试/构建）。
+- 仓库当前 Public；没有选择开源许可证，根目录无 `LICENSE`。
+
+## 5. 未执行 / 已知限制
+
+- 没有创建 GitHub Release；标签已存在，可按需补 Release。
 - CI 未运行浏览器 E2E；E2E 需要 Edge/Playwright 浏览器，仍按 README 在本机执行。
 - `npm ci` 输出 `inflight`、`glob`、`uuid` 的 deprecated 警告；锁文件安装成功，未阻断测试与构建。
 - 本记录是 GitHub 准备检查，不替代 `2026-11-03-acceptance.md` 中的 A01-A35 验收记录。

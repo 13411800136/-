@@ -74,9 +74,12 @@ npm start
 - 第三方依赖的许可证见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 - 不要在 Issue、Actions 日志或提交里写真实密码、令牌、数据库地址；`.env.example` 只放占位值。
 
-## 5. 本次未执行的动作
+## 5. 本次实际结果（2026-11-14）
 
-- 没有配置远程地址，因此没有执行 `git push`。
-- 没有创建 GitHub 仓库。
-- 没有选择项目开源许可证。
-- 没有上传运行数据库、附件或 `.auth-secret`。
+- 仓库：<https://github.com/13411800136/->
+- 远程仓库原本只有占位 README（`5af57be`）；已合并两边历史并保留项目说明。
+- `main` 已推送，提交 `5adf563`；`v1.3.0` 标签已推送。
+- GitHub Actions `CI` 首次运行（run #1）结果为 **success**。
+- 仓库当前为 Public；根目录没有 `LICENSE`，公开状态由作者决定。
+- 没有上传运行数据库、附件、`.env` 或 `.auth-secret`。
+- E2E 未放入 CI（需要浏览器），仍按 README 在本机执行。
