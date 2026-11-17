@@ -640,3 +640,140 @@ export function QcDecisionModal({
     </Modal>
   );
 }
+
+export function WithdrawOrderModal({
+  orderId,
+  orderNo,
+  currentStatusLabel,
+  onClose,
+  onDone
+}: {
+  orderId: string;
+  orderNo: string;
+  currentStatusLabel: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const { key } = useIntentKey('order-withdraw-');
+  const action = useActionState(onDone);
+
+  const submit = () => {
+    if (reason.trim().length < 4) {
+      setError('请填写至少 4 个字的撤回原因');
+      return;
+    }
+    setError(null);
+    void action.run(
+      () => api.post(`/orders/${orderId}/withdraw`, { reason: reason.trim() }, key),
+      '订单已撤回',
+      '订单停止流转并标记为已撤销，历史记录保留'
+    );
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="撤回订单"
+      subtitle={`${orderNo} · 当前状态：${currentStatusLabel}`}
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            取消
+          </Button>
+          <Button variant="danger" loading={action.submitting} onClick={submit}>
+            确认撤回
+          </Button>
+        </>
+      }
+    >
+      <div className="stack">
+        {action.unknown ? <UnknownAlert retry={submit} submitting={action.submitting} /> : null}
+        {action.error ? <Alert tone="danger">{action.error}</Alert> : null}
+        {error ? <Alert tone="danger">{error}</Alert> : null}
+        <Alert tone="warning" title="撤回会立即停止后续流转">
+          已采购、生产中或待发货的订单撤回后不再出现在现场队列；已产生的采购、生产与质检记录会保留在时间线中。
+        </Alert>
+        <Field label="撤回原因" required hint="会写入订单时间线与审计日志，至少 4 个字">
+          <TextArea
+            rows={3}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="例如：客户取消订单 / 需求变更"
+            maxLength={200}
+          />
+        </Field>
+      </div>
+    </Modal>
+  );
+}
+
+export function DeleteOrderModal({
+  orderId,
+  orderNo,
+  statusLabel,
+  onClose,
+  onDone
+}: {
+  orderId: string;
+  orderNo: string;
+  statusLabel: string;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [confirmText, setConfirmText] = useState('');
+  const { key } = useIntentKey('order-delete-');
+  const action = useActionState(onDone);
+
+  const submit = () => {
+    void action.run(
+      () => api.delete(`/orders/${orderId}`, key),
+      '订单已删除',
+      '订单从列表与统计中移除，审计与时间线仍保留'
+    );
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="删除订单"
+      subtitle={`${orderNo} · ${statusLabel}`}
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            取消
+          </Button>
+          <Button
+            variant="danger"
+            loading={action.submitting}
+            disabled={confirmText.trim() !== orderNo}
+            onClick={submit}
+          >
+            永久删除
+          </Button>
+        </>
+      }
+    >
+      <div className="stack">
+        {action.unknown ? <UnknownAlert retry={submit} submitting={action.submitting} /> : null}
+        {action.error ? <Alert tone="danger">{action.error}</Alert> : null}
+        <Alert tone="danger" title="删除后不会出现在任何列表">
+          只能删除已撤销、已撤回或已完成的订单。删除为标记删除：订单不再出现在列表、看板与流水中，
+          但审计日志、时间线与月报文件仍保留，便于追责。
+        </Alert>
+        <Field label={`输入订单号 ${orderNo} 以确认`} required>
+          <TextInput
+            value={confirmText}
+            onChange={(event) => setConfirmText(event.target.value)}
+            placeholder={orderNo}
+          />
+        </Field>
+      </div>
+    </Modal>
+  );
+}

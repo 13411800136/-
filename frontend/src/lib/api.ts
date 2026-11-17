@@ -105,8 +105,11 @@ export const api = {
       headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}
     });
   },
-  delete<T>(path: string): Promise<T> {
-    return request<T>(path, { method: 'DELETE' });
+  delete<T>(path: string, idempotencyKey?: string): Promise<T> {
+    return request<T>(path, {
+      method: 'DELETE',
+      headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}
+    });
   },
   async upload<T>(path: string, file: File, idempotencyKey?: string): Promise<T> {
     const form = new FormData();

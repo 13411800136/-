@@ -1,6 +1,6 @@
 # 功能状态表：R01-R27
 
-版本：v1.6.0 / 2026-11-15
+版本：v1.7.0 / 2026-11-18
 状态定义：**已验收**＝当前版本有真实执行证据；**已实现待验收**＝代码完成但未跑对应场景；**部分实现**＝只完成申报切片；**未实现**；**不适用**＝范围表明确允许或明确不启用。未执行不填“通过”。
 
 ## 1. M 必做逐项状态
@@ -18,7 +18,7 @@
 | R09 质检 | M + v1.4 | **已验收** | `modules/qc/routes.ts` | `order-flow.test.ts`（录入/放行分离、返工复检、重复 PASS）、`inline-master-qc-finance.test.ts`（返工/报废） | 全检；不合格必须处置；返工/报废退回补产；不支持部分交付 |
 | R10 包装 | M | **已验收** | `modules/packing/routes.ts` | `order-flow.test.ts`（未放行拒绝、超量拒绝） | 单产品；数量≤放行/应交 |
 | R11 发货 | M | **已验收** | `modules/shipping/routes.ts` | `order-flow.test.ts`（超发拒绝、足量完成） | 支持多次累计；M 一次发足 |
-| R12 撤销/删除 | M + v1.2 | **已实现（M 边界 + 12h 撤销）** | `modules/cancellations/routes.ts`、`orders/routes.ts` | `auth.test.ts`（五类入口 409）、`order-ops.test.ts`（12h/超时/越权） | 仅待采购订单 12h 内管理员可撤销；其他入口仍拒绝；不删除记录 |
+| R12 撤销/撤回/删除 | M + v1.2/v1.7 | **已验收** | `modules/cancellations/routes.ts`、`orders/routes.ts` | `auth.test.ts`、`order-ops.test.ts`、`orders-withdraw-delete.test.ts` | 12h 撤销保留；新增进行中撤回与已撤销/已完成删除；删除为标记删除 |
 | R13 配件库存 | M | **已验收** | `modules/inventory/routes.ts` | `inventory.test.ts`（增减、非负、幂等、流水） | 手工调整；不自动扣库 |
 | R14 成品库存 | M | **已验收** | `modules/inventory/routes.ts` | `inventory.test.ts`（唯一身份、首建并发、最终 2） | `productKey` 规范化；首次必须正向 |
 | R15 利润 | M + v1.4 | **已验收** | `common/money.ts`、`orders/service.ts`、`modules/finance/routes.ts` | `money.test.ts`、`order-flow.test.ts`（878.00 / 70.24%）、`inline-master-qc-finance.test.ts` | 预计利润；新增订单流水页实时汇总；无电镀成本；非财务结算 |
@@ -28,12 +28,21 @@
 | R19 导出 | M + F | **已验收** | `modules/exports/routes.ts` | `export-attachment.test.ts`、`f-extensions.test.ts`（库存 xlsx） | 订单列表 + 库存台账；其他报表 F 未选做 |
 | R20 通知 | M + F + v1.6 | **已验收** | `common/events.ts`、`modules/notifications/routes.ts`、`reminders.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`、`notifications-archive.test.ts` | 关键事件通知；未读一致；可删除单条/清理已读；交期提醒每日去重 |
 | R21 看板 | M + v1.4/v1.6 | **已验收** | `modules/dashboard/routes.ts`、`DashboardPage.tsx`、`FinancePage.tsx` | `notifications-dashboard.test.ts`（状态和=总数）、看板与流水截图 | 真实数据；利润卡可跳转订单流水；归档单不计入；空集 0 |
-| R22 异常上报 | M | **已验收** | `modules/exceptions/routes.ts` | `notifications-dashboard.test.ts`（关联、跨部门、不改数量） | 上报/查看；处理状态 F 未启用 |
+| R22 异常闭环 | M + v1.7 | **已验收** | `modules/exceptions/routes.ts`、`ExceptionsPage.tsx` | `notifications-dashboard.test.ts`（关联、跨部门、受理/解决、通知回执） | 待处理/处理中/已解决；管理员受理与解决；上报人收到通知 |
 | R23 审计 | M | **已验收** | `common/audit.ts`、`modules/audit/routes.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`（脱敏/只读） | 关键写操作 + 失败；管理员检索为 F 切片 |
 | R24 重试与弱网 | M | **已验收** | `frontend/src/lib/api.ts`、`hooks.ts`、各表单 | `network-retry.spec.ts`（结果未知、草稿恢复、同键重试仅一单） | 持久待同步队列 F 未选做；本版本机草稿 |
-| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 51 测试 | 事务/约束/幂等/条件更新；测试见报告 |
+| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 54 测试 | 事务/约束/幂等/条件更新；测试见报告 |
 | R26 环境交付 | M | **已验收** | `config.ts`、`migrate.ts`、`seed.ts`、`scripts/backup|restore` | 干净目录安装/迁移/构建/启动（日志）、备份恢复新实例核对 | 单机；无远程部署 |
 | R27 AI 与文档 | M | **已验收** | PRD/README/AGENTS/CONSTRAINTS/docs/tasks/tests | 文档索引、追溯表、测试报告、AI 说明 | 与当前版本一致；未实现项如实标注 |
+
+## 1.7 v1.7.0 用户追加增强（非原 M）
+
+| 能力 | 状态 | 实现位置 | 证据 |
+| --- | --- | --- | --- |
+| 现场异常受理/解决闭环 | **已验收** | `modules/exceptions/routes.ts`、`ExceptionsPage.tsx` | `notifications-dashboard.test.ts`、`orders-withdraw-delete.test.ts`、截图 60/61 |
+| 订单撤回 | **已验收** | `orders/routes.ts`、`WithdrawOrderModal` | `orders-withdraw-delete.test.ts`、截图 62/63 |
+| 订单删除（标记删除） | **已验收** | `orders/routes.ts`、`DeleteOrderModal` | `orders-withdraw-delete.test.ts`、截图 64 |
+| 奶油玻璃主题与背景 | **已验收** | `styles/rhine-glass.css`、`app/AppBackground.tsx` | 截图 50/51/56/57/58 |
 
 ## 1.6 v1.6.0 用户追加增强（非原 M）
 

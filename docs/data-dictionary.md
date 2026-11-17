@@ -1,7 +1,7 @@
 # 数据字典：厂序 FactoryFlow
 
 数据库：SQLite 3（Node `node:sqlite`），文件 `data/factory.db`，WAL。
-迁移：`backend/migrations/001_init.sql`、`002_internal_messages.sql`、`003_orders_customers_batch.sql`、`004_orders_archive.sql`（`schema_migrations` 记录校验和）。
+迁移：`001_init.sql`、`002_internal_messages.sql`、`003_orders_customers_batch.sql`、`004_orders_archive.sql`、`005_orders_withdraw_exception_flow.sql`（`schema_migrations` 记录校验和）。
 类型：金额一律 `INTEGER` 分；事件时间 `TEXT` UTC ISO8601；交期 `TEXT` `YYYY-MM-DD`（北京时间日期语义）；布尔 `INTEGER 0/1`。
 约束：核心表使用 `STRICT`；业务数量 `CHECK > 0`；库存 `CHECK >= 0`；外键 `ON`（RESTRICT/CASCADE 见表）；时间线/审计只追加。
 
@@ -25,7 +25,7 @@
 
 | 表 | 关键字段 | 约束/索引 | 说明 |
 | --- | --- | --- | --- |
-| `orders` | `id`、`order_no`、`customer_id`、`customer_name`、`due_date`、`status`、`note`、`created_by`、`created_at`、`updated_at`、`cancelled_at`、`cancelled_by`、`cancel_reason`、`archived_at` | `order_no UNIQUE`；`status CHECK(8 种)`；`(status,created_at)`、客户、交期、`cancelled_at`、`archived_at` 索引 | 主键 UUID 与展示号分离；客户名快照；CANCELLED 为派生有效状态；`archived_at` 非空表示已归档、默认不出现在列表 |
+| `orders` | `id`、`order_no`、`customer_id`、`customer_name`、`due_date`、`status`、`note`、`created_by`、`created_at`、`updated_at`、`cancelled_at`、`cancelled_by`、`cancel_reason`、`archived_at` | `order_no UNIQUE`；`status CHECK(8 种)`；`(status,created_at)`、客户、交期、`cancelled_at`、`archived_at`、`deleted_at` 索引 | 主键 UUID 与展示号分离；客户名快照；CANCELLED 为派生有效状态；`archived_at` 归档、`deleted_at` 标记删除、`withdrawn_at` 撤回时间 |
 | `order_items` | `id`、`order_id`、`part_id`、`product_name`、`spec`、`quantity`、`unit_price_cents`、`created_at` | FK order；`quantity>0`；`unit_price_cents>=0` | M 单明细；产品名/价快照 |
 | `purchase_orders` | `id`、`order_id`、`purchase_no`、`supplier_id`、`supplier_name`、`created_by`、`created_at` | `order_id UNIQUE`（一单一采购单）；`purchase_no UNIQUE` | 供应商快照 |
 | `purchase_items` | `id`、`purchase_order_id`、`part_id`、`part_name`、`spec`、`quantity`、`unit_price_cents`、`created_at` | `purchase_order_id UNIQUE`（M 单配件）；数量/价格 CHECK | 采购价快照 |
@@ -56,7 +56,7 @@
 | `attachments` | `id`、`order_id`、`original_name`、`stored_name`、`mime`、`size_bytes`、`sha256`、`uploaded_by`、`created_at` | `stored_name UNIQUE`；`size>0`；订单索引 | PDF/PNG/JPG；物理文件在 `uploadDir` |
 | `notifications` | `id`、`recipient_id`、`event_type`、`title`、`body`、`resource_type`、`resource_id`、`dedupe_key`、`read_at`、`created_at` | `dedupe_key UNIQUE`；接收人/未读索引 | 事件去重；已读隔离 |
 | `audit_logs` | `id`、`request_id`、`actor_id`、`actor_name`、`action`、`resource_type`、`resource_id`、`result`、`error_code`、`before_json`、`after_json`、`detail`、`created_at` | `result CHECK`；时间/资源索引 | 只追加；写入前脱敏；管理员可检索 |
-| `tablet_exceptions` | `id`、`order_id`、`production_order_id`、`category`、`description`、`status`、`reporter_id`、`created_at` | FK；`status CHECK('OPEN','RESOLVED')` | M 上报/查看；处理状态 F 未启用 |
+| `tablet_exceptions` | `id`、`order_id`、`production_order_id`、`category`、`description`、`status`、`reporter_id`、`acknowledged_at`、`acknowledged_by`、`resolved_at`、`resolved_by`、`resolution_note`、`created_at` | FK；`status CHECK('OPEN','RESOLVED')`；`acknowledged_at` 非空即处理中 | 待处理/处理中/已解决；解决必须写结论 |
 | `internal_messages` | `id`、`sender_id`、`recipient_id`、`order_id`、`body`、`read_at`、`created_at` | `sender<>recipient`；`body` 2-1000；收件人/发件人索引 | 现场与管理员/其他职务沟通；只追加，不删除 |
 | `order_timeline` | `id`、`order_id`、`event_type`、`actor_id`、`actor_name`、`resource_type`、`resource_id`、`quantity`、`payload_json`、`created_at` | FK；`(order_id,created_at,id)` | 业务时间线；稳定事件枚举 |
 | `idempotency_requests` | `id`、`actor_id`、`operation`、`key`、`request_hash`、`status`、`response_status`、`response_json`、`business_id`、`created_at`、`expires_at` | `UNIQUE(actor_id,operation,key)`；过期索引 | 请求意图绑定与结果回放 |

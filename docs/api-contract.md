@@ -1,6 +1,6 @@
 # API 合同：厂序 FactoryFlow
 
-版本：v1.6.0（2026-11-15）
+版本：v1.7.0（2026-11-18）
 前缀：`/api/v1`；Content-Type：`application/json`（附件上传为 multipart，导出为 xlsx）。
 成功：`{ "data": ..., "requestId": "..." }`；失败：`{ "error": { "code": "...", "message": "...", "details": ... }, "requestId": "..." }`。
 
@@ -58,7 +58,8 @@
 | `GET /orders/:id/operation-summary` | ADMIN | 数量与 allowedActions | — |
 | `GET /order-statuses` | ADMIN | 状态枚举与中文 | — |
 | `PATCH /orders/:id/status` | ADMIN | **明确拒绝** 409，防止绕过动作 | — |
-| `DELETE /orders/:id` | ADMIN | **明确拒绝** 409 | — |
+| `POST /orders/:id/withdraw` | ADMIN | 撤回进行中订单，原因必填 | 必需 |
+| `DELETE /orders/:id` | ADMIN | 标记删除已撤销/已撤回或已完成订单 | 必需 |
 
 ### 2.4 采购、到货、生产
 
@@ -157,7 +158,9 @@
 | `GET /tablet/order-options` | 现场角色 | 可关联订单选项 |
 | `GET /exceptions` | ADMIN | 全部异常 |
 | `GET /exceptions/:id` | 上报人/ADMIN | 异常详情 |
-| `PATCH /exceptions/:id` | ADMIN | 409（处理状态 F 未启用） |
+| `POST /exceptions/:id/acknowledge` | ADMIN | 受理异常（可填说明），通知上报人 | 必需 |
+| `POST /exceptions/:id/resolve` | ADMIN | 解决异常，结论必填，通知上报人 | 必需 |
+| `PATCH /exceptions/:id` | — | 不提供（404），避免通用状态修改 | — |
 | `GET /audit-logs` | ADMIN | 分页/资源/结果/关键词筛选 |
 | `DELETE/PATCH /audit-logs/:id` | ADMIN | 409，审计不可改删 |
 | `GET /messages/recipients` | 已认证 | 可联系的其他启用账号（排除自己） |

@@ -13,6 +13,8 @@ import {
   RefreshCw,
   Send,
   ShieldCheck,
+  Trash2,
+  Undo2,
   Truck,
   UserRound
 } from 'lucide-react';
@@ -43,6 +45,8 @@ import {
 import {
   CancelOrderModal,
   ConfirmActionModal,
+  DeleteOrderModal,
+  WithdrawOrderModal,
   ProductionModal,
   PurchaseModal,
   QcDecisionModal,
@@ -60,6 +64,8 @@ type ModalState =
   | { type: 'packingDispatch' }
   | { type: 'shipmentTrigger' }
   | { type: 'cancelOrder' }
+  | { type: 'withdrawOrder' }
+  | { type: 'deleteOrder' }
   | null;
 
 export function OrderDetailPage() {
@@ -227,6 +233,27 @@ export function OrderDetailPage() {
               onClick={() => setModal({ type: 'cancelOrder' })}
             >
               撤销订单
+            </Button>
+          ) : null}
+          {!summary.canCancel && order.status !== 'COMPLETED' && order.status !== 'CANCELLED' ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Undo2 size={14} />}
+              className="fx-glitch"
+              onClick={() => setModal({ type: 'withdrawOrder' })}
+            >
+              撤回订单
+            </Button>
+          ) : null}
+          {order.status === 'COMPLETED' || order.status === 'CANCELLED' ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<Trash2 size={14} />}
+              onClick={() => setModal({ type: 'deleteOrder' })}
+            >
+              删除订单
             </Button>
           ) : null}
           {waitingText ? <span className="waiting-chip">{waitingText}</span> : null}
@@ -757,6 +784,27 @@ export function OrderDetailPage() {
         </aside>
       </div>
 
+      {modal?.type === 'withdrawOrder' ? (
+        <WithdrawOrderModal
+          orderId={order.id}
+          orderNo={order.orderNo}
+          currentStatusLabel={order.statusLabel}
+          onClose={closeModal}
+          onDone={done}
+        />
+      ) : null}
+      {modal?.type === 'deleteOrder' ? (
+        <DeleteOrderModal
+          orderId={order.id}
+          orderNo={order.orderNo}
+          statusLabel={order.statusLabel}
+          onClose={closeModal}
+          onDone={() => {
+            closeModal();
+            navigate('/admin/orders');
+          }}
+        />
+      ) : null}
       {modal?.type === 'cancelOrder' && summary.cancelDeadline ? (
         <CancelOrderModal
           orderId={order.id}

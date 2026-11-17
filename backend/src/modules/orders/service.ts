@@ -51,6 +51,9 @@ export interface OrderRow {
   cancelled_at: string | null;
   cancelled_by: string | null;
   cancel_reason: string | null;
+  withdrawn_at: string | null;
+  withdraw_reason: string;
+  deleted_at: string | null;
 }
 
 export interface OrderItemRow {
@@ -172,8 +175,8 @@ export interface TimelineRow {
 }
 
 export function getOrderOrThrow(db: AppDatabase, orderId: string): OrderRow {
-  const order = db.get<OrderRow>('SELECT * FROM orders WHERE id = ?', orderId);
-  if (!order) throw errors.notFound('订单不存在');
+  const order = db.get<OrderRow>('SELECT * FROM orders WHERE id = ? AND deleted_at IS NULL', orderId);
+  if (!order) throw errors.notFound('订单不存在或已删除');
   return order;
 }
 
@@ -617,7 +620,9 @@ export function getOrderDetail(db: AppDatabase, orderId: string) {
       createdAt: order.created_at,
       updatedAt: order.updated_at,
       cancelledAt: order.cancelled_at,
-      cancelReason: order.cancel_reason
+      cancelReason: order.cancel_reason,
+      withdrawnAt: order.withdrawn_at,
+      withdrawReason: order.withdraw_reason
     },
     items: items.map((item) => ({
       id: item.id,

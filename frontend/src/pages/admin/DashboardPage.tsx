@@ -285,9 +285,15 @@ export function DashboardPage() {
               title="订单利润口径"
               hint="预计值，非财务结算"
               action={
-                <button type="button" className="text-link" onClick={() => navigate('/admin/finance')}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="btn-white fx-mask fx-parallax"
+                  data-fx-particles
+                  onClick={() => navigate('/admin/finance')}
+                >
                   查看订单流水 <ArrowRight size={14} />
-                </button>
+                </Button>
               }
             />
             <div className="profit-hero">

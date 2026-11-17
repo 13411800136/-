@@ -41,3 +41,6 @@ Thumbs.db
 
 # 归档月报（运行产物）
 archives/
+
+# 构建临时目录（Windows 杀软会锁 esbuild 临时文件）
+.buildtmp/

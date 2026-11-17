@@ -3,6 +3,7 @@ import { AuthProvider, homeForRole, useAuth } from './app/AuthContext';
 import { GuestRoute, ProtectedRoute } from './app/ProtectedRoute';
 import { AppShell } from './app/AppShell';
 import { EffectsLayer } from './app/EffectsLayer';
+import { AppBackground } from './app/AppBackground';
 import { ToastProvider } from './components/Toast';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/admin/DashboardPage';
@@ -42,7 +43,9 @@ function NotFound() {
 
 export function App() {
   return (
-    <BrowserRouter>
+    <>
+      <AppBackground />
+      <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
           <Routes>
@@ -194,6 +197,8 @@ export function App() {
           <EffectsLayer />
         </ToastProvider>
       </AuthProvider>
-    </BrowserRouter>
+
+      </BrowserRouter>
+    </>
   );
 }

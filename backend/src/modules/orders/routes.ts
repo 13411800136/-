@@ -76,6 +76,10 @@ const listQuery = pageQuery.extend({
   archived: z.enum(['0', '1']).optional()
 });
 
+const withdrawSchema = z.object({
+  reason: requiredText(200, '撤回原因')
+});
+
 const cancelSchema = z.object({
   reason: requiredText(200, '撤销原因')
 });
@@ -98,6 +102,7 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
     const where: string[] = [];
     const params: Array<string | number> = [];
     // 归档订单默认不出现；显式 archived=1 时才查看历史归档
+    where.push('o.deleted_at IS NULL');
     where.push(query.archived === '1' ? 'o.archived_at IS NOT NULL' : 'o.archived_at IS NULL');
     if (query.status === 'CANCELLED') {
       where.push('o.cancelled_at IS NOT NULL');
@@ -442,8 +447,113 @@ export async function registerOrderRoutes(app: FastifyInstance, ctx: AppContext)
     throw errors.feature('不支持通用状态修改接口；请通过采购、到货、生产、质检、包装、发货等受控动作推进状态');
   });
 
-  app.delete('/orders/:id', admin, async () => {
-    throw errors.feature('V1 不支持删除业务订单；录入错误请保留记录并按人工流程处理');
+
+  app.post('/orders/:id/withdraw', admin, async (request, reply) => {
+    const { id } = validate(idParam, request.params);
+    const key = requireIdempotencyKey(request);
+    const input = validate(withdrawSchema, request.body);
+    const actor = request.auth!.user;
+
+    const result = runIdempotent(
+      db,
+      { actorId: actor.id, operation: 'order.withdraw', key, payload: { id, ...input } },
+      () => {
+        const order = getOrderOrThrow(db, id);
+        if (order.cancelled_at) {
+          throw errors.conflict('订单已撤销或已撤回，不能重复操作');
+        }
+        if (order.status === 'COMPLETED') {
+          throw errors.invalidState('已完成订单不能撤回；如确需清理请使用删除');
+        }
+        const now = nowIso();
+        db.run(
+          `UPDATE orders
+           SET cancelled_at = ?, cancelled_by = ?, cancel_reason = ?,
+               withdrawn_at = ?, withdraw_reason = ?, updated_at = ?
+           WHERE id = ? AND cancelled_at IS NULL`,
+          now,
+          actor.id,
+          input.reason,
+          now,
+          input.reason,
+          now,
+          id
+        );
+        addTimeline(db, {
+          orderId: id,
+          eventType: 'ORDER_WITHDRAWN',
+          actor,
+          resourceType: 'ORDER',
+          resourceId: id,
+          payload: { reason: input.reason, previousStatus: order.status }
+        });
+        writeAudit(db, {
+          requestId: request.id,
+          actor,
+          action: 'ORDER_WITHDRAW',
+          resourceType: 'ORDER',
+          resourceId: id,
+          result: 'SUCCESS',
+          before: { status: order.status, orderNo: order.order_no },
+          after: { status: 'CANCELLED', reason: input.reason }
+        });
+        return {
+          data: {
+            id,
+            status: 'CANCELLED' as const,
+            statusLabel: ORDER_STATUS_LABELS.CANCELLED,
+            withdrawnAt: now,
+            reason: input.reason
+          },
+          businessId: id
+        };
+      }
+    );
+    reply.header('Idempotent-Replayed', String(result.replayed));
+    return ok(reply, request, result.data, result.replayed ? 200 : result.status);
+  });
+
+  app.delete('/orders/:id', admin, async (request, reply) => {
+    const { id } = validate(idParam, request.params);
+    const key = requireIdempotencyKey(request);
+    const actor = request.auth!.user;
+
+    const result = runIdempotent(
+      db,
+      { actorId: actor.id, operation: 'order.delete', key, payload: { id } },
+      () => {
+        const order = getOrderOrThrow(db, id);
+        const status = effectiveStatus(order);
+        if (!order.cancelled_at && order.status !== 'COMPLETED') {
+          throw errors.invalidState('只能删除已撤销、已撤回或已完成的订单；进行中的订单请先撤回', {
+            currentStatus: status
+          });
+        }
+        const now = nowIso();
+        db.run('UPDATE orders SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL', now, now, id);
+        addTimeline(db, {
+          orderId: id,
+          eventType: 'ORDER_DELETED',
+          actor,
+          resourceType: 'ORDER',
+          resourceId: id,
+          payload: { orderNo: order.order_no, previousStatus: status }
+        });
+        writeAudit(db, {
+          requestId: request.id,
+          actor,
+          action: 'ORDER_DELETE',
+          resourceType: 'ORDER',
+          resourceId: id,
+          result: 'SUCCESS',
+          before: { orderNo: order.order_no, status },
+          after: { deleted: true }
+        });
+        return { data: { id, deleted: true }, businessId: id };
+      }
+    );
+    reply.header('Idempotent-Replayed', String(result.replayed));
+    return ok(reply, request, result.data, result.replayed ? 200 : result.status);
   });
 
   app.get('/order-statuses', admin, async (request, reply) =>

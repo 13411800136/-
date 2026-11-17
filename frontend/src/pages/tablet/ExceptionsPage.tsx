@@ -156,7 +156,17 @@ export function TabletExceptionsPage() {
                   <article key={item.id}>
                     <div>
                       <span className="exception-tag">{item.categoryLabel ?? item.category}</span>
-                      <span className="soft-badge soft-badge-warn">{item.status === 'OPEN' ? '待处理' : '已处理'}</span>
+                      <span
+                className={
+                  item.status === 'RESOLVED'
+                    ? 'soft-badge soft-badge-ok'
+                    : item.status === 'ACKNOWLEDGED'
+                      ? 'soft-badge soft-badge-info'
+                      : 'soft-badge soft-badge-warn'
+                }
+              >
+                {item.statusLabel ?? (item.status === 'RESOLVED' ? '已解决' : item.status === 'ACKNOWLEDGED' ? '处理中' : '待处理')}
+              </span>
                     </div>
                     <p>{item.description}</p>
                     <small>

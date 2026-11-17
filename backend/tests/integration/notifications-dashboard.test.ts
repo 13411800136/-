@@ -133,9 +133,33 @@ test('现场异常关联订单、部门隔离且不改变数量', async () => {
   assert.equal(adminList.statusCode, 200);
   assert.equal(adminList.json().data.items.length, 1);
 
-  const resolve = await call(env.app, admin, 'PATCH', `/exceptions/${report.json().data.id}`, { status: 'RESOLVED' });
-  assert.equal(resolve.statusCode, 409);
-  assert.equal(resolve.json().error.code, 'FEATURE_NOT_ENABLED');
+  const exceptionId = report.json().data.id;
+  // 不再提供通用状态修改入口
+  const genericPatch = await call(env.app, admin, 'PATCH', `/exceptions/${exceptionId}`, { status: 'RESOLVED' });
+  assert.equal(genericPatch.statusCode, 404);
+
+  // 处理流程：受理 → 解决，上报人可见状态与结论
+  const ack = await call(env.app, admin, 'POST', `/exceptions/${exceptionId}/acknowledge`, { note: '已到现场' }, key('ex-ack'));
+  assert.equal(ack.statusCode, 200, ack.body);
+  const tabletAfterAck = await call(env.app, prod, 'GET', '/tablet/exceptions');
+  assert.equal(tabletAfterAck.json().data.items[0].statusLabel, '处理中');
+
+  const resolve = await call(
+    env.app,
+    admin,
+    'POST',
+    `/exceptions/${exceptionId}/resolve`,
+    { note: '更换夹具并复检，恢复正常' },
+    key('ex-resolve')
+  );
+  assert.equal(resolve.statusCode, 200, resolve.body);
+  const adminAfter = await call(env.app, admin, 'GET', '/exceptions');
+  const resolvedRow = adminAfter.json().data.items.find((row: { id: string }) => row.id === exceptionId);
+  assert.equal(resolvedRow.status, 'RESOLVED');
+  assert.equal(resolvedRow.statusLabel, '已解决');
+  assert.equal(resolvedRow.resolutionNote, '更换夹具并复检，恢复正常');
+  const tabletAfterResolve = await call(env.app, prod, 'GET', '/tablet/exceptions');
+  assert.equal(tabletAfterResolve.json().data.items[0].statusLabel, '已解决');
 
   const afterCount = env.db.get<{ count: number }>(
     'SELECT COUNT(*) AS count FROM production_feedbacks WHERE production_order_id = ?',

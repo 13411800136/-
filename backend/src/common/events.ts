@@ -21,6 +21,10 @@ export type TimelineEventType =
   | 'ORDER_COMPLETED'
   | 'ORDER_CANCELLED'
   | 'EXCEPTION_REPORTED'
+  | 'EXCEPTION_ACKNOWLEDGED'
+  | 'EXCEPTION_RESOLVED'
+  | 'ORDER_WITHDRAWN'
+  | 'ORDER_DELETED'
   | 'PRICE_VISIBILITY_CHANGED';
 
 export function addTimeline(
@@ -88,4 +92,23 @@ export function notifyAdmins(db: AppDatabase, input: NotifyInput): void {
       now
     );
   }
+}
+
+/** 通知单个用户（例如异常处理结果回给上报人）。 */
+export function notifyUser(db: AppDatabase, userId: string, input: NotifyInput): void {
+  db.run(
+    `INSERT INTO notifications(id, recipient_id, event_type, title, body, resource_type, resource_id,
+                              dedupe_key, read_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+     ON CONFLICT(dedupe_key) DO NOTHING`,
+    newId(),
+    userId,
+    input.eventType,
+    input.title,
+    input.body,
+    input.resourceType,
+    input.resourceId,
+    `${input.dedupeKey}:${userId}`,
+    nowIso()
+  );
 }

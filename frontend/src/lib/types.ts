@@ -91,6 +91,8 @@ export interface OperationSummary {
   cancelDeadline: string | null;
   cancelledAt: string | null;
   cancelReason: string | null;
+  withdrawnAt?: string | null;
+  withdrawReason?: string | null;
   perItem: Array<{
     itemId: string;
     productName: string;
@@ -495,7 +497,13 @@ export interface ExceptionItem {
   categoryLabel?: string;
   description: string;
   status: string;
+  statusLabel?: string;
   reporterName: string;
+  acknowledgedAt?: string | null;
+  acknowledgedByName?: string | null;
+  resolvedAt?: string | null;
+  resolvedByName?: string | null;
+  resolutionNote?: string;
   createdAt: string;
 }
 
