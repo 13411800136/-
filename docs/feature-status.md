@@ -1,6 +1,6 @@
 # 功能状态表：R01-R27
 
-版本：v1.7.0 / 2026-11-18
+版本：v1.8.0 / 2026-11-21
 状态定义：**已验收**＝当前版本有真实执行证据；**已实现待验收**＝代码完成但未跑对应场景；**部分实现**＝只完成申报切片；**未实现**；**不适用**＝范围表明确允许或明确不启用。未执行不填“通过”。
 
 ## 1. M 必做逐项状态
@@ -31,9 +31,18 @@
 | R22 异常闭环 | M + v1.7 | **已验收** | `modules/exceptions/routes.ts`、`ExceptionsPage.tsx` | `notifications-dashboard.test.ts`（关联、跨部门、受理/解决、通知回执） | 待处理/处理中/已解决；管理员受理与解决；上报人收到通知 |
 | R23 审计 | M | **已验收** | `common/audit.ts`、`modules/audit/routes.ts` | `order-flow.test.ts`、`notifications-dashboard.test.ts`（脱敏/只读） | 关键写操作 + 失败；管理员检索为 F 切片 |
 | R24 重试与弱网 | M | **已验收** | `frontend/src/lib/api.ts`、`hooks.ts`、各表单 | `network-retry.spec.ts`（结果未知、草稿恢复、同键重试仅一单） | 持久待同步队列 F 未选做；本版本机草稿 |
-| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 54 测试 | 事务/约束/幂等/条件更新；测试见报告 |
+| R25 可靠性 | M | **已验收** | `db/database.ts`、`common/idempotency.ts`、各 service | `inventory.test.ts`（两连接并发/同键并发）、`atomicity.test.ts`（中途失败回滚）、全部 57 测试 | 事务/约束/幂等/条件更新；测试见报告 |
 | R26 环境交付 | M | **已验收** | `config.ts`、`migrate.ts`、`seed.ts`、`scripts/backup|restore` | 干净目录安装/迁移/构建/启动（日志）、备份恢复新实例核对 | 单机；无远程部署 |
 | R27 AI 与文档 | M | **已验收** | PRD/README/AGENTS/CONSTRAINTS/docs/tasks/tests | 文档索引、追溯表、测试报告、AI 说明 | 与当前版本一致；未实现项如实标注 |
+
+## 1.8 v1.8.0 用户追加增强（非原 M）
+
+| 能力 | 状态 | 实现位置 | 证据 |
+| --- | --- | --- | --- |
+| 通知删除（标记删除、不复发） | **已验收** | `notifications/routes.ts`、`006_notifications_soft_delete.sql` | `notifications-batch.test.ts`、截图 74/75 |
+| 通知批量删除/批量已读 | **已验收** | `notifications/routes.ts`、`NotificationsPage.tsx` | `notifications-batch.test.ts`、截图 74 |
+| 蓝天白墙主题 | **已验收** | `styles/sky-theme.css`、`app/AppBackground.tsx`、`assets/sky-cat.jpg` | 截图 71/72/74/76/77 |
+| 审计日志自然语言化 | **已验收** | `lib/audit-labels.ts`、`AuditPage.tsx` | 截图 76、`audit-labels` 单测（前端类型） |
 
 ## 1.7 v1.7.0 用户追加增强（非原 M）
 

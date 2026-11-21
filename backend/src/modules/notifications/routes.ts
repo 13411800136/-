@@ -34,13 +34,13 @@ export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppC
       created_at: string;
     }>(
       `SELECT id, event_type, title, body, resource_type, resource_id, read_at, created_at
-       FROM notifications WHERE recipient_id = ? ${query.unreadOnly === '1' ? 'AND read_at IS NULL' : ''}
+       FROM notifications WHERE recipient_id = ? AND deleted_at IS NULL ${query.unreadOnly === '1' ? 'AND read_at IS NULL' : ''}
        ORDER BY created_at DESC LIMIT ?`,
       actor.id,
       query.limit
     );
     const unread = db.get<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL',
+      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL AND deleted_at IS NULL',
       actor.id
     );
     return ok(reply, request, {
@@ -62,7 +62,7 @@ export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppC
   app.get('/notifications/unread-count', admin, async (request, reply) => {
     generateDueSoonNotifications(db);
     const row = db.get<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL',
+      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL AND deleted_at IS NULL',
       request.auth!.user.id
     );
     return ok(reply, request, { unreadCount: row?.count ?? 0 });
@@ -81,7 +81,7 @@ export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppC
       db.run('UPDATE notifications SET read_at = ? WHERE id = ? AND recipient_id = ?', nowIso(), id, actor.id);
     }
     const unread = db.get<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL',
+      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL AND deleted_at IS NULL',
       actor.id
     );
     return ok(reply, request, { id, read: true, unreadCount: unread?.count ?? 0 });
@@ -96,9 +96,14 @@ export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppC
     );
     if (!notification) throw errors.notFound('通知不存在');
     if (notification.recipient_id !== actor.id) throw errors.forbidden('不能删除其他人的通知');
-    db.run('DELETE FROM notifications WHERE id = ? AND recipient_id = ?', id, actor.id);
+    db.run(
+      'UPDATE notifications SET deleted_at = ? WHERE id = ? AND recipient_id = ? AND deleted_at IS NULL',
+      nowIso(),
+      id,
+      actor.id
+    );
     const unread = db.get<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL',
+      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL AND deleted_at IS NULL',
       actor.id
     );
     return ok(reply, request, { id, deleted: true, unreadCount: unread?.count ?? 0 });
@@ -107,11 +112,12 @@ export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppC
   app.post('/notifications/clear-read', admin, async (request, reply) => {
     const actor = request.auth!.user;
     const result = db.run(
-      'DELETE FROM notifications WHERE recipient_id = ? AND read_at IS NOT NULL',
+      'UPDATE notifications SET deleted_at = ? WHERE recipient_id = ? AND read_at IS NOT NULL AND deleted_at IS NULL',
+      nowIso(),
       actor.id
     );
     const unread = db.get<{ count: number }>(
-      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL',
+      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL AND deleted_at IS NULL',
       actor.id
     );
     return ok(reply, request, {
@@ -120,10 +126,60 @@ export async function registerNotificationRoutes(app: FastifyInstance, ctx: AppC
     });
   });
 
+
+  app.post('/notifications/batch', admin, async (request, reply) => {
+    const input = validate(
+      z.object({
+        ids: z
+          .array(z.string().min(1))
+          .min(1, '请至少选择一条通知')
+          .max(100, '单次最多处理 100 条通知')
+          .refine((ids) => new Set(ids).size === ids.length, '通知不能重复选择'),
+        action: z.enum(['delete', 'read'])
+      }),
+      request.body
+    );
+    const actor = request.auth!.user;
+    const now = nowIso();
+    const placeholders = input.ids.map(() => '?').join(', ');
+    let changed = 0;
+    db.tx(() => {
+      if (input.action === 'delete') {
+        const result = db.run(
+          `UPDATE notifications SET deleted_at = ?
+           WHERE recipient_id = ? AND deleted_at IS NULL AND id IN (${placeholders})`,
+          now,
+          actor.id,
+          ...input.ids
+        );
+        changed = Number(result.changes);
+      } else {
+        const result = db.run(
+          `UPDATE notifications SET read_at = ?
+           WHERE recipient_id = ? AND deleted_at IS NULL AND read_at IS NULL AND id IN (${placeholders})`,
+          now,
+          actor.id,
+          ...input.ids
+        );
+        changed = Number(result.changes);
+      }
+    });
+    const unread = db.get<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM notifications WHERE recipient_id = ? AND read_at IS NULL AND deleted_at IS NULL',
+      actor.id
+    );
+    return ok(reply, request, {
+      action: input.action,
+      requested: input.ids.length,
+      changed,
+      unreadCount: unread?.count ?? 0
+    });
+  });
+
   app.post('/notifications/mark-all-read', admin, async (request, reply) => {
     const actor = request.auth!.user;
     const updated = db.run(
-      'UPDATE notifications SET read_at = ? WHERE recipient_id = ? AND read_at IS NULL',
+      'UPDATE notifications SET read_at = ? WHERE recipient_id = ? AND read_at IS NULL AND deleted_at IS NULL',
       nowIso(),
       actor.id
     );

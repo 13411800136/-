@@ -1,5 +1,5 @@
 requirement,m_status,implementation,api,tables,tests,result,notes
-R01 身份与会话,已验收,modules/auth/routes.ts; common/auth.ts; common/crypto.ts,POST /auth/login; GET /auth/me; POST /auth/logout,users;sessions;audit_logs,tests/integration/auth.test.ts;master-session.test.ts;tests/e2e/full-flow.spec.ts,54/54 + 2/2 通过,真实会话与角色；停用撤销旧会话
+R01 身份与会话,已验收,modules/auth/routes.ts; common/auth.ts; common/crypto.ts,POST /auth/login; GET /auth/me; POST /auth/logout,users;sessions;audit_logs,tests/integration/auth.test.ts;master-session.test.ts;tests/e2e/full-flow.spec.ts,57/57 + 2/2 通过,真实会话与角色；停用撤销旧会话
 R02 基础数据,已验收,modules/master/routes.ts,GET/POST/PATCH /customers /suppliers /parts /departments /users,users;departments;customers;suppliers;parts,tests/integration/master-session.test.ts,通过,编码唯一；停用不删历史
 R03 业务订单,已验收,modules/orders/routes.ts; orders/service.ts; modules/master/auto-create.ts,GET/POST /orders; GET /orders/:id,orders;order_items;order_timeline;audit_logs,tests/integration/order-flow.test.ts;inline-master-qc-finance.test.ts;tests/e2e/full-flow.spec.ts,通过,单产品；输入新客户/新配件自动建档；无编辑取消
 R04 采购,已验收,modules/purchases/routes.ts,POST /orders/:id/purchase-orders,purchase_orders;purchase_items,tests/integration/order-flow.test.ts,通过,一单一采购单；价格快照
@@ -42,3 +42,7 @@ v1.7-1 异常闭环,已验收,modules/exceptions/routes.ts; ExceptionsPage.tsx,P
 v1.7-2 订单撤回,已验收,modules/orders/routes.ts,POST /orders/:id/withdraw,orders;order_timeline;audit_logs,orders-withdraw-delete.test.ts,通过,原因必填；重复撤回 409
 v1.7-3 订单删除,已验收,modules/orders/routes.ts,DELETE /orders/:id,orders,orders-withdraw-delete.test.ts,通过,标记删除；详情 404；看板/流水排除
 v1.7-4 奶油玻璃主题,已验收,styles/rhine-glass.css; app/AppBackground.tsx,—,—,tests/evidence/e2e/50-58,通过,立体方块背景+毛玻璃+大圆角；白色流水按钮
+"v1.8-1 通知标记删除","已验收","notifications/routes.ts; 006_notifications_soft_delete.sql","DELETE /notifications/:id","notifications","notifications-batch.test.ts","通过","删除后当天不再生成；未读数排除已删除"
+"v1.8-2 通知批量操作","已验收","notifications/routes.ts; NotificationsPage.tsx","POST /notifications/batch","notifications","notifications-batch.test.ts","通过","1-100 条；批量删除/已读"
+"v1.8-3 蓝调插画主题","已验收","styles/sky-theme.css; app/AppBackground.tsx","—","—","tests/evidence/e2e/71-77","通过","用户提供插画；天空蓝+珊瑚橙"
+"v1.8-4 审计自然语言","已验收","lib/audit-labels.ts; AuditPage.tsx","GET /audit-logs","audit_logs","tests/evidence/e2e/76-audit-readable.png","通过","不展示动作代码，字段变化中文化"

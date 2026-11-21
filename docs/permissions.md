@@ -51,6 +51,7 @@
 | 订单归档 | 仅 ADMIN；写月报文件并标记 archived_at | `archive/routes.ts` |
 | 订单撤回/删除 | 仅 ADMIN；撤回进行中订单、标记删除已撤销/已完成订单 | `orders/routes.ts` |
 | 异常处理 | 仅 ADMIN；受理、解决并通知上报人 | `exceptions/routes.ts` |
+| 通知批量操作 | 仅 ADMIN；批量删除/批量已读，只能操作自己的通知 | `notifications/routes.ts` |
 | 通知删除 | 仅 ADMIN 且只能删除自己的通知 | `notifications/routes.ts` |
 | 附件 | 管理员；订单必须存在；下载按附件 ID + 存储键，不暴露本地路径 | `attachments/routes.ts` |
 | 订单导出 | 管理员；筛选条件由服务端重新执行 | `exports/routes.ts` |

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Trash2, Bell, CheckCheck, Circle } from 'lucide-react';
 import { api, errorMessage } from '../../lib/api';
 import { fmtDateTime } from '../../lib/format';
-import { useAsync, useDocumentTitle } from '../../lib/hooks';
+import { useAsync, useDocumentTitle, useIntentKey } from '../../lib/hooks';
 import type { NotificationItem } from '../../lib/types';
 import {
   Button,
@@ -22,7 +22,10 @@ const EVENT_LABELS: Record<string, string> = {
   PACKING_RECORDED: '包装记录',
   SHIPMENT_RECORDED: '物流发货',
   ORDER_COMPLETED: '订单完成',
-  TABLET_EXCEPTION_REPORTED: '现场异常'
+  TABLET_EXCEPTION_REPORTED: '现场异常',
+  DUE_SOON: '交期',
+  EXCEPTION_ACKNOWLEDGED: '异常受理',
+  EXCEPTION_RESOLVED: '异常解决'
 };
 
 export function NotificationsPage() {
@@ -30,6 +33,9 @@ export function NotificationsPage() {
   const toast = useToast();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batching, setBatching] = useState(false);
+  const { key: batchKey, renew: renewBatchKey } = useIntentKey('notifications-batch-');
   const notifications = useAsync<{ items: NotificationItem[]; unreadCount: number }>(
     () => api.get(`/notifications?unreadOnly=${filter === 'unread' ? '1' : '0'}`),
     [filter]
@@ -82,6 +88,40 @@ export function NotificationsPage() {
   };
 
   const items = notifications.data?.items ?? [];
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const allSelected = items.length > 0 && items.every((item) => selectedSet.has(item.id));
+
+  const toggle = (id: string) => {
+    setSelected((current) => (current.includes(id) ? current.filter((value) => value !== id) : [...current, id]));
+  };
+
+  const toggleAll = () => {
+    setSelected(allSelected ? [] : items.map((item) => item.id));
+  };
+
+  const batch = async (action: 'delete' | 'read') => {
+    if (selected.length === 0) return;
+    setBatching(true);
+    try {
+      const result = await api.post<{ changed: number; requested: number }>(
+        '/notifications/batch',
+        { ids: selected, action },
+        batchKey
+      );
+      toast.success(
+        action === 'delete' ? '已批量删除' : '已批量标为已读',
+        `处理 ${result.changed} / ${result.requested} 条`
+      );
+      setSelected([]);
+      renewBatchKey();
+      notifications.reload();
+      notifyShell();
+    } catch (reason) {
+      toast.error(action === 'delete' ? '批量删除失败' : '批量标记失败', errorMessage(reason));
+    } finally {
+      setBatching(false);
+    }
+  };
 
   return (
     <div className="stack-lg">
@@ -113,12 +153,36 @@ export function NotificationsPage() {
             { value: 'unread', label: '未读', count: notifications.data?.unreadCount }
           ]}
           value={filter}
-          onChange={(value) => setFilter(value as 'all' | 'unread')}
+          onChange={(value) => {
+            setFilter(value as 'all' | 'unread');
+            setSelected([]);
+          }}
         />
+        <label className="notification-select-all">
+          <input type="checkbox" checked={allSelected} onChange={toggleAll} disabled={items.length === 0} />
+          全选
+        </label>
         <span className="unread-summary">
           <Circle size={9} fill="currentColor" /> 未读 {notifications.data?.unreadCount ?? 0} 条
         </span>
       </div>
+
+      {selected.length > 0 ? (
+        <div className="batch-bar notification-batch-bar">
+          <span>
+            已选择 <strong>{selected.length}</strong> 条通知
+          </span>
+          <Button size="sm" variant="secondary" loading={batching} onClick={() => void batch('read')}>
+            批量标为已读
+          </Button>
+          <Button size="sm" variant="danger" loading={batching} onClick={() => void batch('delete')}>
+            批量删除
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setSelected([])}>
+            取消选择
+          </Button>
+        </div>
+      ) : null}
 
       {notifications.loading && !notifications.data ? (
         <LoadingState rows={5} />
@@ -134,6 +198,14 @@ export function NotificationsPage() {
         <div className="notification-list">
           {items.map((item) => (
             <article key={item.id} className={item.read ? 'notification-item' : 'notification-item notification-unread'}>
+              <label className="notification-check" onClick={(event) => event.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={selectedSet.has(item.id)}
+                  onChange={() => toggle(item.id)}
+                  aria-label={`选择通知 ${item.title}`}
+                />
+              </label>
               <span className="notification-dot">{!item.read ? <Circle size={8} fill="currentColor" /> : null}</span>
               <div className="notification-copy">
                 <div className="notification-head">

@@ -5,6 +5,7 @@ import './styles/global.css';
 import './styles/line-theme.css';
 import './styles/effects.css';
 import './styles/rhine-glass.css';
+import './styles/sky-theme.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

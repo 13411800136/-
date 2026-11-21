@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { fmtDateTime } from '../../lib/format';
 import { useAsync, useDocumentTitle } from '../../lib/hooks';
 import type { AuditItem, Pagination } from '../../lib/types';
+import { auditChanges, auditResultText, auditSummary } from '../../lib/audit-labels';
 import {
   Button,
   EmptyState,
@@ -54,7 +55,7 @@ export function AuditPage() {
       <PageHeader
         eyebrow="AUDIT TRAIL"
         title="审计日志"
-        description="关键写操作的操作者、资源、时间、请求关联与脱敏前后值。普通角色不可改删，管理员也不提供删除入口。"
+        description="以自然语言记录谁在什么时候做了什么、对象是谁、结果如何。只追加，不提供修改或删除入口。"
         actions={
           <span className="hint-chip">
             <ShieldCheck size={14} /> 只追加记录
@@ -125,8 +126,7 @@ export function AuditPage() {
                   <th />
                   <th>时间</th>
                   <th>操作者</th>
-                  <th>动作</th>
-                  <th>资源</th>
+                  <th>做了什么</th>
                   <th>结果</th>
                   <th>请求 ID</th>
                 </tr>
@@ -148,39 +148,46 @@ export function AuditPage() {
                       <td className="muted">{fmtDateTime(item.createdAt)}</td>
                       <td>{item.actorName}</td>
                       <td>
-                        <span className="mono audit-action">{item.action}</span>
-                      </td>
-                      <td>
-                        <span className="cell-sub">
-                          {item.resourceType}
-                          {item.resourceId ? ` · ${item.resourceId.slice(0, 8)}` : ''}
-                        </span>
+                        <span className="audit-action">{auditSummary(item)}</span>
+                        {item.result !== 'SUCCESS' ? <span className="cell-sub">未完成</span> : null}
                       </td>
                       <td>
                         <span className={item.result === 'SUCCESS' ? 'result-ok' : 'result-fail'}>
-                          {item.result === 'SUCCESS' ? '成功' : '失败'}
+                          {auditResultText(item)}
                         </span>
-                        {item.errorCode ? <span className="cell-sub">{item.errorCode}</span> : null}
                       </td>
                       <td className="mono muted request-id">{item.requestId.slice(0, 8)}</td>
                     </tr>
                     {expanded === item.id ? (
                       <tr className="audit-detail-row">
-                        <td colSpan={7}>
-                          <div className="audit-detail">
-                            <div>
-                              <h4>变更前</h4>
-                              <pre>{item.before ? JSON.stringify(item.before, null, 2) : '—'}</pre>
-                            </div>
-                            <div>
-                              <h4>变更后</h4>
-                              <pre>{item.after ? JSON.stringify(item.after, null, 2) : '—'}</pre>
-                            </div>
-                            {item.detail ? (
-                              <div className="audit-detail-note">
-                                <h4>说明</h4>
-                                <p>{item.detail}</p>
-                              </div>
+                        <td colSpan={6}>
+                          <div className="audit-detail audit-detail-readable">
+                            {auditChanges(item).length > 0 ? (
+                              <ul className="audit-change-list">
+                                {auditChanges(item).map((change) => (
+                                  <li key={change.key}>
+                                    <span className="audit-change-label">{change.label}</span>
+                                    {change.kind === 'added' ? (
+                                      <span className="audit-change-to">{change.after}</span>
+                                    ) : change.kind === 'removed' ? (
+                                      <span className="audit-change-from">{change.before}</span>
+                                    ) : (
+                                      <>
+                                        <span className="audit-change-from">{change.before}</span>
+                                        <span className="audit-change-arrow">→</span>
+                                        <span className="audit-change-to">{change.after}</span>
+                                      </>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="audit-detail-empty">
+                                {item.detail || '本次操作没有字段变更，记录用于留痕。'}
+                              </p>
+                            )}
+                            {item.detail && auditChanges(item).length > 0 ? (
+                              <p className="audit-detail-note-line">说明：{item.detail}</p>
                             ) : null}
                           </div>
                         </td>

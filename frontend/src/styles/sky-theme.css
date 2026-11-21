@@ -1,0 +1,687 @@
+/* ============================================================
+   蓝天白墙主题（v1.8.0）
+   背景：用户提供的插画（src/assets/sky-cat.jpg）
+   基调：天空蓝 + 白墙 + 珊瑚橙点缀；毛玻璃与柔和阴影
+   只改视觉，不改 DOM 结构与业务逻辑
+   ============================================================ */
+
+:root {
+  --paper: #e9f4fb;
+  --paper-2: #dcecf7;
+  --card: rgba(255, 255, 255, 0.62);
+  --card-2: rgba(255, 255, 255, 0.4);
+  --card-3: rgba(255, 255, 255, 0.24);
+  --ink: #102a3c;
+  --ink-2: #17384f;
+  --ink-3: #214862;
+  --paper-text: #f4fbff;
+  --muted: #4a6577;
+  --faint: #7893a6;
+  --line: rgba(16, 58, 84, 0.13);
+  --line-strong: rgba(16, 58, 84, 0.22);
+  --signal: #ff8a5b;
+  --accent: #ff8a5b;
+  --accent-dark: #e8734a;
+  --danger: #c94f43;
+  --teal: #2f7f8f;
+  --radius: 22px;
+  --radius-sm: 14px;
+  --shadow-card:
+    0 28px 56px -34px rgba(16, 62, 94, 0.45),
+    0 3px 10px rgba(16, 62, 94, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  --shadow-float:
+    0 40px 80px -40px rgba(16, 62, 94, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --glass-blur: blur(22px) saturate(1.12);
+}
+
+/* ---------- 背景插画 ---------- */
+
+.app-bg {
+  background: #e9f4fb;
+}
+
+.app-bg-photo {
+  position: absolute;
+  inset: -3%;
+  background: url('../assets/sky-cat.jpg') center 32% / cover no-repeat;
+  transform: translate3d(calc(var(--bg-x, 0) * -10px), calc(var(--bg-y, 0) * -7px), 0) scale(1.04);
+  transition: transform 1.1s cubic-bezier(0.22, 0.61, 0.36, 1);
+  filter: saturate(1.06) contrast(1.02);
+}
+
+.app-bg-wash {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(240, 250, 255, 0.92) 0%,
+      rgba(243, 251, 255, 0.72) 14%,
+      rgba(247, 252, 255, 0.42) 32%,
+      rgba(247, 252, 255, 0.42) 58%,
+      rgba(236, 247, 253, 0.68) 100%
+    ),
+    radial-gradient(46% 36% at 86% 10%, rgba(255, 255, 255, 0.6), transparent 72%);
+}
+
+.app-bg-grain {
+  opacity: 0.28;
+}
+
+.app-bg-vignette {
+  background: radial-gradient(120% 100% at 50% 38%, transparent 52%, rgba(20, 62, 92, 0.16) 100%);
+}
+
+/* ---------- 侧栏 ---------- */
+
+.sidebar {
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: linear-gradient(158deg, rgba(255, 255, 255, 0.76) 0%, rgba(226, 242, 252, 0.52) 100%);
+  box-shadow:
+    0 40px 80px -42px rgba(12, 52, 80, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.brand .brand-mark {
+  background: linear-gradient(160deg, #1b4a6b, #0e2f47);
+  color: #eaf7ff;
+  box-shadow: 0 10px 20px -10px rgba(12, 48, 74, 0.8);
+}
+
+.brand-copy strong,
+.sidebar .brand-copy strong {
+  color: var(--ink);
+}
+
+.sidebar-context {
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-left: 2px solid var(--signal);
+  background: rgba(255, 255, 255, 0.46);
+}
+
+.nav-item {
+  color: #4a6577;
+}
+
+.nav-item::before {
+  color: #8aa6b8;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.66);
+  color: #102a3c;
+}
+
+.nav-item-active,
+.nav-item-active:hover {
+  background: linear-gradient(150deg, #1f5478, #123a54);
+  color: #f2fbff;
+  box-shadow: 0 14px 26px -16px rgba(10, 44, 68, 0.85);
+}
+
+.nav-item-active::before {
+  color: var(--signal);
+}
+
+.nav-badge,
+.nav-item-active .nav-badge {
+  background: var(--signal);
+  color: #3a1305;
+}
+
+.sidebar-note {
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-left: 2px solid rgba(255, 138, 91, 0.8);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.sidebar-note-title,
+.sidebar-user-copy strong {
+  color: var(--ink);
+}
+
+.sidebar-note p,
+.sidebar-user-copy span {
+  color: #6f8899;
+}
+
+.sidebar-user {
+  border-top: 1px solid rgba(16, 58, 84, 0.12);
+}
+
+.sidebar .icon-button-dark {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  color: var(--ink);
+}
+
+.sidebar .icon-button-dark:hover {
+  background: #123a54;
+  color: #eaf7ff;
+}
+
+/* ---------- 顶栏 ---------- */
+
+.topbar {
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background: linear-gradient(150deg, rgba(255, 255, 255, 0.74), rgba(228, 243, 252, 0.52));
+  box-shadow:
+    0 22px 44px -30px rgba(12, 52, 80, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.topbar-kicker {
+  color: #7d98aa;
+}
+
+.topbar-title strong {
+  color: var(--ink);
+}
+
+.topbar-date {
+  color: #7d98aa;
+}
+
+.topbar-bell {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.66);
+  color: var(--ink);
+}
+
+.topbar-bell:hover {
+  background: #123a54;
+  color: #eaf7ff;
+}
+
+.topbar-avatar {
+  background: linear-gradient(150deg, #1f5478, #102a3c);
+}
+
+/* ---------- 卡片与面板 ---------- */
+
+.card,
+.kpi-grid .kpi-card,
+.stage-card {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.76) 0%, rgba(232, 245, 253, 0.5) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: var(--shadow-card);
+}
+
+.card-table,
+.table-wrap.card-table {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.72), rgba(232, 245, 253, 0.46));
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  box-shadow: var(--shadow-card);
+}
+
+.kpi-title,
+.kpi-label {
+  color: #5d7a8d;
+}
+
+.kpi-value,
+.kpi-money {
+  color: var(--ink);
+}
+
+.kpi-foot {
+  color: #7d98aa;
+}
+
+.profit-card,
+.profit-panel-card,
+.kpi-ink {
+  background:
+    radial-gradient(120% 100% at 100% 0%, rgba(255, 138, 91, 0.22), transparent 55%),
+    linear-gradient(150deg, #17415d 0%, #102f46 58%, #0a2335 100%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 36px 70px -40px rgba(6, 30, 48, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.profit-card .kpi-label,
+.profit-card .muted-note {
+  color: rgba(234, 247, 255, 0.66);
+}
+
+/* ---------- 表格 ---------- */
+
+.data-table th {
+  background: rgba(255, 255, 255, 0.42);
+  border-bottom: 1px solid var(--line);
+  color: #6f8899;
+}
+
+.data-table td {
+  border-bottom: 1px solid rgba(16, 58, 84, 0.09);
+  color: #24435a;
+}
+
+.data-table tbody tr.row-clickable:hover {
+  background: rgba(214, 238, 252, 0.55);
+}
+
+/* ---------- 表单 ---------- */
+
+.text-input,
+.textarea,
+.select,
+input[type='text'],
+input[type='search'],
+input[type='date'],
+input[type='month'],
+input[type='number'],
+input[type='password'] {
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--ink);
+  box-shadow:
+    inset 0 1px 2px rgba(16, 58, 84, 0.06),
+    0 6px 14px -12px rgba(12, 52, 80, 0.6);
+}
+
+.text-input:focus,
+.textarea:focus,
+.select:focus {
+  border-color: rgba(255, 138, 91, 0.75);
+  box-shadow:
+    0 0 0 3px rgba(255, 138, 91, 0.16),
+    inset 0 1px 2px rgba(16, 58, 84, 0.05);
+}
+
+.field label,
+.field-label {
+  color: #4a6577;
+}
+
+/* ---------- 按钮 ---------- */
+
+.btn-primary {
+  background: linear-gradient(155deg, #1f5478, #123a54);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f2fbff;
+  box-shadow:
+    0 18px 30px -18px rgba(10, 44, 68, 0.85),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(155deg, #2a6b93, #174763);
+  border-color: rgba(255, 138, 91, 0.5);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(16, 58, 84, 0.22);
+}
+
+.btn-ghost {
+  color: #4a6577;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.55);
+  color: var(--ink);
+}
+
+.btn-dark {
+  background: linear-gradient(150deg, #17415d, #0e2f47);
+}
+
+.btn-white {
+  background: #ffffff;
+  border-color: rgba(255, 255, 255, 0.95);
+  color: #123a54;
+  box-shadow:
+    0 18px 34px -22px rgba(10, 44, 68, 0.7),
+    0 2px 6px rgba(10, 44, 68, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+.btn-white:hover:not(:disabled) {
+  border-color: rgba(255, 138, 91, 0.7);
+  color: #0e2f47;
+}
+
+.btn-danger {
+  background: linear-gradient(150deg, #d4624f, #b8453a);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff8f4;
+}
+
+/* ---------- 徽标与筛选 ---------- */
+
+.filter-chip {
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.5);
+  color: #4a6577;
+}
+
+.filter-chip:hover {
+  background: rgba(255, 255, 255, 0.8);
+  color: #123a54;
+}
+
+.filter-chip-active {
+  background: linear-gradient(150deg, #1f5478, #123a54);
+  color: #f2fbff;
+  border-color: transparent;
+  box-shadow: 0 14px 26px -18px rgba(10, 44, 68, 0.8);
+}
+
+.exception-summary-chip {
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.55);
+  color: #4a6577;
+}
+
+.exception-summary-chip strong {
+  color: #123a54;
+}
+
+.soft-badge-warn {
+  border-color: rgba(255, 138, 91, 0.5);
+  background: rgba(255, 138, 91, 0.14);
+  color: #a44a28;
+}
+
+.soft-badge-info,
+.soft-badge-ok {
+  border-color: rgba(47, 127, 143, 0.35);
+  background: rgba(47, 127, 143, 0.12);
+  color: #1f5d69;
+}
+
+.exception-resolution {
+  background: rgba(47, 127, 143, 0.12);
+  color: #1f5d69;
+}
+
+/* ---------- 弹窗 ---------- */
+
+.modal-panel {
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: linear-gradient(158deg, rgba(255, 255, 255, 0.95), rgba(232, 245, 253, 0.88));
+  box-shadow:
+    0 60px 120px -50px rgba(8, 40, 64, 0.75),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
+}
+
+.modal-backdrop {
+  background: rgba(8, 34, 52, 0.32);
+}
+
+/* ---------- 登录页 ---------- */
+
+.login-visual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(238, 249, 255, 0.78) 0%,
+    rgba(240, 250, 255, 0.34) 45%,
+    rgba(248, 253, 255, 0.72) 100%
+  );
+  pointer-events: none;
+}
+
+.login-visual::after {
+  display: none;
+}
+
+.login-brand strong,
+.login-hero h1 {
+  color: #0e2f47;
+}
+
+.login-brand small,
+.login-lede,
+.login-flow-step span,
+.login-flow-note,
+.login-proof span,
+.login-disclaimer {
+  color: #4a6577;
+}
+
+.login-flow-step strong,
+.login-proof strong {
+  color: #123a54;
+}
+
+.login-flow-step {
+  border-color: rgba(16, 58, 84, 0.18);
+}
+
+.login-card {
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(230, 244, 253, 0.62));
+  box-shadow:
+    0 70px 120px -60px rgba(8, 40, 64, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.98);
+}
+
+.login-input-wrap {
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.login-input-wrap:focus-within {
+  border-color: rgba(255, 138, 91, 0.75);
+  box-shadow: 0 0 0 3px rgba(255, 138, 91, 0.16);
+}
+
+.demo-account {
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.demo-account:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.demo-account.is-active {
+  border-color: rgba(255, 138, 91, 0.8);
+  background: rgba(255, 138, 91, 0.14);
+}
+
+/* ---------- 通知：列表与批量操作 ---------- */
+
+.notification-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #4a6577;
+  font-size: 11.5px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.notification-select-all input,
+.notification-check input {
+  width: 14px;
+  height: 14px;
+  accent-color: #1f5478;
+}
+
+.notification-check {
+  display: flex;
+  align-items: center;
+  padding-top: 2px;
+}
+
+.notification-list {
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.74), rgba(232, 245, 253, 0.52));
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-card);
+}
+
+.notification-item {
+  border-bottom: 1px solid rgba(16, 58, 84, 0.1);
+}
+
+.notification-item:hover {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.notification-unread {
+  background: linear-gradient(90deg, rgba(255, 138, 91, 0.12), rgba(255, 255, 255, 0.12) 55%);
+}
+
+.notification-unread:hover {
+  background: linear-gradient(90deg, rgba(255, 138, 91, 0.18), rgba(255, 255, 255, 0.4) 60%);
+}
+
+.notification-copy p {
+  color: #35556b;
+}
+
+.notification-head strong {
+  color: #102a3c;
+}
+
+.notification-head time {
+  color: #7d98aa;
+}
+
+.event-tag {
+  border-radius: 999px;
+  border: 1px solid rgba(31, 84, 120, 0.24);
+  background: rgba(31, 84, 120, 0.1);
+  color: #1f5478;
+}
+
+.notification-batch-bar,
+.batch-bar {
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 34px -26px rgba(10, 44, 68, 0.55);
+  color: #35556b;
+}
+
+.batch-bar strong {
+  color: #123a54;
+}
+
+/* ---------- 审计：人话展示 ---------- */
+
+.audit-action {
+  color: #102a3c;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.audit-detail-readable {
+  display: block;
+}
+
+.audit-change-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.audit-change-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.66);
+  font-size: 12px;
+  color: #24435a;
+}
+
+.audit-change-label {
+  color: #6f8899;
+}
+
+.audit-change-from {
+  color: #7d98aa;
+  text-decoration: line-through;
+  text-decoration-color: rgba(125, 152, 170, 0.6);
+}
+
+.audit-change-arrow {
+  color: #ff8a5b;
+  font-weight: 700;
+}
+
+.audit-change-to {
+  color: #123a54;
+  font-weight: 600;
+}
+
+.audit-detail-empty,
+.audit-detail-note-line {
+  margin: 0;
+  color: #4a6577;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.audit-detail-note-line {
+  margin-top: 8px;
+  color: #6f8899;
+}
+
+/* ---------- 页面标题与筛选条 ---------- */
+
+.page-header {
+  position: relative;
+}
+
+.page-header h1,
+.page-header .page-title {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.page-header p,
+.page-header .page-description {
+  color: #33546a;
+}
+
+.filter-bar {
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: 0 18px 34px -28px rgba(10, 44, 68, 0.5);
+}
+
+/* ---------- 响应式与降级 ---------- */
+
+@media (max-width: 920px) {
+  .app-bg-photo {
+    background-position: 58% 30%;
+  }
+}
+
+@media (max-width: 680px) {
+  .audit-change-list li {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-bg-photo {
+    transition: none;
+  }
+}

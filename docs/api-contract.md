@@ -1,6 +1,6 @@
 # API 合同：厂序 FactoryFlow
 
-版本：v1.7.0（2026-11-18）
+版本：v1.8.0（2026-11-21）
 前缀：`/api/v1`；Content-Type：`application/json`（附件上传为 multipart，导出为 xlsx）。
 成功：`{ "data": ..., "requestId": "..." }`；失败：`{ "error": { "code": "...", "message": "...", "details": ... }, "requestId": "..." }`。
 
@@ -160,6 +160,7 @@
 | `GET /exceptions/:id` | 上报人/ADMIN | 异常详情 |
 | `POST /exceptions/:id/acknowledge` | ADMIN | 受理异常（可填说明），通知上报人 | 必需 |
 | `POST /exceptions/:id/resolve` | ADMIN | 解决异常，结论必填，通知上报人 | 必需 |
+| `POST /notifications/batch` | ADMIN | 批量删除或标为已读（1–100 条） | 必需 |
 | `PATCH /exceptions/:id` | — | 不提供（404），避免通用状态修改 | — |
 | `GET /audit-logs` | ADMIN | 分页/资源/结果/关键词筛选 |
 | `DELETE/PATCH /audit-logs/:id` | ADMIN | 409，审计不可改删 |

@@ -1,7 +1,7 @@
 # 数据字典：厂序 FactoryFlow
 
 数据库：SQLite 3（Node `node:sqlite`），文件 `data/factory.db`，WAL。
-迁移：`001_init.sql`、`002_internal_messages.sql`、`003_orders_customers_batch.sql`、`004_orders_archive.sql`、`005_orders_withdraw_exception_flow.sql`（`schema_migrations` 记录校验和）。
+迁移：`001_init.sql`、`002_internal_messages.sql`、`003_orders_customers_batch.sql`、`004_orders_archive.sql`、`005_orders_withdraw_exception_flow.sql`、`006_notifications_soft_delete.sql`（`schema_migrations` 记录校验和）。
 类型：金额一律 `INTEGER` 分；事件时间 `TEXT` UTC ISO8601；交期 `TEXT` `YYYY-MM-DD`（北京时间日期语义）；布尔 `INTEGER 0/1`。
 约束：核心表使用 `STRICT`；业务数量 `CHECK > 0`；库存 `CHECK >= 0`；外键 `ON`（RESTRICT/CASCADE 见表）；时间线/审计只追加。
 
@@ -54,7 +54,7 @@
 | 表 | 关键字段 | 约束/索引 | 说明 |
 | --- | --- | --- | --- |
 | `attachments` | `id`、`order_id`、`original_name`、`stored_name`、`mime`、`size_bytes`、`sha256`、`uploaded_by`、`created_at` | `stored_name UNIQUE`；`size>0`；订单索引 | PDF/PNG/JPG；物理文件在 `uploadDir` |
-| `notifications` | `id`、`recipient_id`、`event_type`、`title`、`body`、`resource_type`、`resource_id`、`dedupe_key`、`read_at`、`created_at` | `dedupe_key UNIQUE`；接收人/未读索引 | 事件去重；已读隔离 |
+| `notifications`（新增 `deleted_at`） | `id`、`recipient_id`、`event_type`、`title`、`body`、`resource_type`、`resource_id`、`dedupe_key`、`read_at`、`created_at` | `dedupe_key UNIQUE`；接收人/未读索引 | 事件去重；已读隔离 |
 | `audit_logs` | `id`、`request_id`、`actor_id`、`actor_name`、`action`、`resource_type`、`resource_id`、`result`、`error_code`、`before_json`、`after_json`、`detail`、`created_at` | `result CHECK`；时间/资源索引 | 只追加；写入前脱敏；管理员可检索 |
 | `tablet_exceptions` | `id`、`order_id`、`production_order_id`、`category`、`description`、`status`、`reporter_id`、`acknowledged_at`、`acknowledged_by`、`resolved_at`、`resolved_by`、`resolution_note`、`created_at` | FK；`status CHECK('OPEN','RESOLVED')`；`acknowledged_at` 非空即处理中 | 待处理/处理中/已解决；解决必须写结论 |
 | `internal_messages` | `id`、`sender_id`、`recipient_id`、`order_id`、`body`、`read_at`、`created_at` | `sender<>recipient`；`body` 2-1000；收件人/发件人索引 | 现场与管理员/其他职务沟通；只追加，不删除 |

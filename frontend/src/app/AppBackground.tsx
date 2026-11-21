@@ -1,13 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-const ROWS = [
-  { top: 44, blocks: 15, seed: 3 },
-  { top: 57, blocks: 21, seed: 7 },
-  { top: 69, blocks: 27, seed: 11 }
-];
-
 /**
- * 背景层：奶油色“档案柜”立体方块 + 柔和光晕 + 颗粒。
+ * 背景层：用户提供的蓝天白墙猫咪插画 + 蓝色薄雾 + 颗粒 + 暗角。
  * 只做视觉，固定在最底层；指针视差在减少动态偏好下关闭。
  */
 export function AppBackground() {
@@ -37,25 +31,8 @@ export function AppBackground() {
 
   return (
     <div className="app-bg" aria-hidden="true" ref={ref}>
+      <div className="app-bg-photo" />
       <div className="app-bg-wash" />
-      <div className="app-bg-glow" />
-      <div className="app-bg-archive">
-        {ROWS.map((row, rowIndex) => (
-          <div
-            key={rowIndex}
-            className="app-bg-row"
-            style={{ top: `${row.top}%`, opacity: 0.92 - rowIndex * 0.16 }}
-          >
-            {Array.from({ length: row.blocks }).map((_, index) => (
-              <span
-                key={index}
-                className="app-bg-block"
-                style={{ height: `${30 + ((index * 37 + row.seed * 13) % 44)}%` }}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
       <div className="app-bg-grain" />
       <div className="app-bg-vignette" />
     </div>
